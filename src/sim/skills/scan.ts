@@ -71,6 +71,10 @@ export const scan: Skill<z.infer<typeof schema>> = {
       return { ok: true, observation: 'Scanned a full circle. Nothing in range.' }
     }
 
+    // A sweep is done with the camera, so everything it passes is recognised.
+    // That is what makes scan the expensive, thorough option next to a glance.
+    ctx.world.model.recognise(seen.keys())
+
     const found: string[] = []
     const moved: string[] = []
     let confirmed = 0

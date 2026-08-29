@@ -40,7 +40,15 @@ export interface PerceptionSettings {
  * the only one that scales: a text manifest grows with the world, an image does
  * not.
  */
-export type ObservationDetail = 'full' | 'proprioceptive'
+/**
+ * `detections` is the middle ground, and the most honest one: a wide sensor
+ * reports that something is there, how big it is and where — geometry, which is
+ * all a depth sensor or a lidar returns. It cannot tell you a block is red.
+ * Identity has to be earned by pointing the camera at the thing and looking,
+ * which is exactly the split a real stack has between navigation and
+ * recognition.
+ */
+export type ObservationDetail = 'full' | 'detections' | 'proprioceptive'
 
 export interface RobotProfile {
   id: string

@@ -1,29 +1,36 @@
 import { z } from 'zod'
-import { type Skill, type SkillResult, until } from './types.js'
+import { knownLabels, resolveTarget, type Skill, type SkillResult, until } from './types.js'
 
 const schema = z.object({
-  object: z.string().min(1).describe('The id of the object to turn towards, as labelled in a photo.')
+  object: z
+    .string()
+    .min(1)
+    .describe(
+      'What to turn towards: an object id if you know it, or the handle of something you have ' +
+        'only detected, such as "unknown_2".'
+    )
 })
 
 export const face: Skill<z.infer<typeof schema>> = {
   name: 'face',
   category: 'locomotion',
   description:
-    'Turn on the spot to point at an object, naming it by id rather than by coordinates. ' +
-    'Useful for lining up a photo before taking one.',
+    'Turn on the spot to point at something, naming it rather than giving coordinates. ' +
+    'Useful for lining up a photo before taking one — including of something you have detected ' +
+    'but not yet identified.',
   schema,
 
   check(_robot, { object: id }, world): string | null {
     if (world.model.knows(id) || world.find(id)) return null
-    const known = world.model.all().map((b) => b.id)
+    const known = knownLabels(world)
     return known.length > 0
-      ? `Never seen "${id}". Objects seen so far: ${known.join(', ')}.`
+      ? `Never seen "${id}". Known so far: ${known.join(', ')}.`
       : `Never seen "${id}", and nothing has been seen yet. Look around first.`
   },
 
   async run(robot, { object: id }, ctx): Promise<SkillResult> {
-    const belief = ctx.world.model.get(id)
-    const target = belief ?? ctx.world.find(id)?.position
+    const { belief, object } = resolveTarget(ctx.world, id)
+    const target = belief ?? object?.position
     if (!target) return { ok: false, observation: `Never seen "${id}".` }
 
     const tx = 'x' in target ? target.x : 0

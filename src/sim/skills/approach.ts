@@ -1,10 +1,24 @@
 import { z } from 'zod'
 import { Robot } from '../Robot.js'
 import { shortestAngle, steerToward, surroundingsFrom } from '../steering.js'
-import { obstacleAhead, stalls, type Skill, type SkillResult, until } from './types.js'
+import {
+  knownLabels,
+  obstacleAhead,
+  resolveTarget,
+  stalls,
+  type Skill,
+  type SkillResult,
+  until
+} from './types.js'
 
 const schema = z.object({
-  object: z.string().min(1).describe('The id of the object to walk up to, as labelled in a photo.')
+  object: z
+    .string()
+    .min(1)
+    .describe(
+      'What to walk up to: an object id if you know it, or the handle of something you have ' +
+        'only detected, such as "unknown_2".'
+    )
 })
 
 /** Stop this far short, so the object ends up within reach rather than underfoot. */
@@ -21,17 +35,17 @@ export const approach: Skill<z.infer<typeof schema>> = {
 
   check(_robot, { object: id }, world): string | null {
     if (world.model.knows(id) || world.find(id)) return null
-    const known = world.model.all().map((b) => b.id)
+    const known = knownLabels(world)
     return known.length > 0
-      ? `Never seen "${id}". Objects seen so far: ${known.join(', ')}.`
+      ? `Never seen "${id}". Known so far: ${known.join(', ')}.`
       : `Never seen "${id}", and nothing has been seen yet. Look around first.`
   },
 
   async run(robot, { object: id }, ctx): Promise<SkillResult> {
     // The belief, not the truth — the robot walks to where it thinks the thing
     // is, and finds out on arrival whether it was right.
-    const belief = ctx.world.model.get(id)
-    const target = belief ?? ctx.world.find(id)?.position
+    const { id: realId, belief, object } = resolveTarget(ctx.world, id)
+    const target = belief ?? object?.position
     if (!target) return { ok: false, observation: `Never seen "${id}".` }
 
     const tx = 'x' in target ? target.x : 0
@@ -42,7 +56,7 @@ export const approach: Skill<z.infer<typeof schema>> = {
 
     const stalled = stalls(2.5)
     // The thing being approached must not repel the robot away from itself.
-    const around = surroundingsFrom(ctx.world, id)
+    const around = surroundingsFrom(ctx.world, realId)
     let blocked = false
 
     const arrived = await until(ctx, budget, () => {
@@ -63,7 +77,7 @@ export const approach: Skill<z.infer<typeof schema>> = {
     robot.stop()
 
     // Where it actually is now, which may differ from where the robot believed.
-    const actual = ctx.world.find(id)?.position
+    const actual = ctx.world.find(realId)?.position
     const distance = actual ? robot.distanceTo(actual.x, actual.z) : Infinity
 
     if (blocked) {

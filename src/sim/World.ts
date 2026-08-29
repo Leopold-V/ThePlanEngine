@@ -180,9 +180,12 @@ export class World {
    * large world, and an image does.
    */
   observationText(detail: ObservationDetail = 'full'): string {
-    return detail === 'proprioceptive'
-      ? describe(this.robot)
-      : describe(this.robot, this.model, this.sightings, this.simTime)
+    if (detail === 'proprioceptive') return describe(this.robot)
+    // `full` is the classical stack, where detection and recognition arrive
+    // together, so it simply names everything it senses. That is a property of
+    // how the report is written, not of the belief map — which records only
+    // what a camera genuinely recognised, whatever mode is running.
+    return describe(this.robot, this.model, this.sightings, this.simTime, detail === 'full')
   }
 
   /**
@@ -216,6 +219,10 @@ export class World {
         this.sightings,
         this.perceptionConfig
       )
+      // Taking the photograph is the recognition step: what the camera has in
+      // frame is what the robot can now name. Everything else it has merely
+      // bumped into stays anonymous.
+      this.model.recognise(frame.labelled)
       // The model gets this frame either way; showing it is what lets the
       // operator see the one moment the robot does something visual.
       this.hud.flashPhoto(

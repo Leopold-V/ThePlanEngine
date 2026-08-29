@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import type { RobotProfile, SkillOverride } from '@shared/profile.js'
+import type { ObservationDetail, RobotProfile, SkillOverride } from '@shared/profile.js'
 import { SKILLS } from '@sim/skills/registry.js'
 import type { SkillCategory } from '@sim/skills/types.js'
 import { fingerprint, resolveProfile, type ResolvedSkill } from '@engine/resolveProfile.js'
@@ -160,18 +160,20 @@ export function RobotPanel({ profile, onChange, onReset, onClose }: Props): Reac
                 onChange={(e) =>
                   onChange({
                     ...profile,
-                    observationDetail: e.target.value as 'full' | 'proprioceptive'
+                    observationDetail: e.target.value as ObservationDetail
                   })
                 }
               >
                 <option value="full">Full — pose, plus visible and remembered objects</option>
+                <option value="detections">Detections — geometry, but nothing is named</option>
                 <option value="proprioceptive">Proprioceptive — pose and grip only</option>
               </select>
               <small>
-                Full simulates a detection-and-mapping stack feeding a planner. Proprioceptive
-                gives only what a robot senses of itself, so objects must be found with{' '}
-                <code>look</code> — which is what a vision-language-action model actually gets,
-                and the only mode that scales to a large world.
+                Full simulates a detection-and-mapping stack feeding a planner. Detections is
+                what a depth sensor or lidar really gives: something is there, this big, this far
+                — identity has to be earned by pointing the camera at it with <code>look</code>.
+                Proprioceptive gives only what the robot senses of itself, which is what a
+                vision-language-action model actually gets.
               </small>
             </label>
 

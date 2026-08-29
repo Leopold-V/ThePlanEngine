@@ -225,10 +225,10 @@ v0.1 is the loop. The reason the project exists is what comes after it.
       slope avoidance by local probing, and arrivals that name what they went around
 - [x] **v0.7.1** — the sensors move into the head: a glance turns the neck, not the whole body,
       and the camera and field of view follow it
-- [ ] **v0.8** — talking to it mid-task: interrupt and redirect a run in progress
-- [ ] **v0.9** — recording and replay; deterministic reruns
-- [ ] **later** — detection separated from recognition: wide sensing that reports *something is
-      there*, and a camera that has to be pointed at it to learn *what* it is
+- [x] **v0.8** — detection separated from recognition: sensing reports *something is there*, and
+      a camera has to be pointed at it to learn *what* it is
+- [ ] **v0.9** — talking to it mid-task: interrupt and redirect a run in progress
+- [ ] **v0.10** — recording and replay; deterministic reruns
 - [ ] **later** — hardware as a configuration: the sensor loadout becomes a profile choice —
       head camera, 360° lidar, mounting and field of view — so what the robot is *built from* is
       a variable rather than a constant

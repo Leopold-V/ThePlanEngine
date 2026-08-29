@@ -9,6 +9,32 @@ import { DEFAULT_MAX_ITERATIONS, DEFAULT_SYSTEM_PROMPT } from './prompt.js'
  * Appended in `proprioceptive` mode. Without it the model waits for an object
  * list that is never coming, and never thinks to take a photo.
  */
+const DETECTIONS_NOTE = `
+SENSING
+- Your sensors report that something is there, how big it is and where — geometry, nothing more.
+  They cannot tell you what a thing is. Anything you have not looked at is listed as 'unknown_N'
+  with its size, and that handle works with 'approach', 'face' and 'pick_up'.
+- To learn what something is, point your camera at it and use 'look'. Whatever is in shot is
+  identified from then on and keeps its real name.
+- 'scan' sweeps the camera all the way round and identifies everything it passes, which is
+  thorough but slow. 'look' with a direction turns only your head, which is much quicker.
+- Detecting a thing is enough to walk to it or pick it up. It is not enough to know it is the one
+  you were asked for.`
+
+/**
+ * The mode note is appended rather than baked into the prompt, so editing the
+ * prompt cannot leave the model believing it will be told things it will not be.
+ */
+function appendModeNote(prompt: string, detail: ObservationDetail): string {
+  if (detail === 'detections') return `${prompt}\n${DETECTIONS_NOTE}`
+  if (detail === 'proprioceptive') return `${prompt}\n${PROPRIOCEPTIVE_NOTE}`
+  return prompt
+}
+
+/**
+ * Appended in `proprioceptive` mode. Without it the model waits for an object
+ * list that is never coming, and never thinks to take a photo.
+ */
 const PROPRIOCEPTIVE_NOTE = `
 SENSING
 - You are NOT told what objects exist or where they are. Your observation gives only your own
@@ -82,7 +108,7 @@ export function resolveProfile(
   return {
     // The mode note is appended rather than baked in, so editing the prompt
     // cannot leave the model believing it will be told things it will not be.
-    systemPrompt: detail === 'proprioceptive' ? `${basePrompt}\n${PROPRIOCEPTIVE_NOTE}` : basePrompt,
+    systemPrompt: appendModeNote(basePrompt, detail),
     maxIterations: profile.maxIterations ?? DEFAULT_MAX_ITERATIONS,
     observationDetail: detail,
     perception: {

@@ -76,14 +76,11 @@ real one: Unitree ship the G1 and H1 with exactly that, while Figure and Optimus
 camera-only. Extend `perception` into a sensor loadout when this lands rather than adding a
 parallel concept.
 
-**Its prerequisite is splitting detection from recognition**, which `perceive()` currently
-conflates: anything inside the cone comes back fully identified, so today a wider sensor really
-would hand the model every object id in range. That is a defect in the simulation, not a property
-of wide sensors — a lidar returns geometry and cannot tell you a block is red. Done properly,
-wide sensing yields anonymous detections (position, extent, "something is there", enough for
-`steering.ts`) and the head camera yields identity, so `look` becomes structurally necessary
-rather than merely encouraged: you cannot name a thing you have only bumped into. Until that split
-exists, do not widen the default field of view.
+Its prerequisite — splitting detection from recognition — now exists as the `detections`
+observation mode, so a wide sensor no longer hands the model every object id in range. A loadout
+should therefore pair its sensor geometry with the mode that sensor honestly supports: a lidar is
+wide and `detections`, a camera is narrow and can name things. Do not ship a loadout that is both
+wide and `full`.
 
 ## The two extension points
 
@@ -123,10 +120,22 @@ it generates the JSON Schema sent to the model *and* validates the arguments tha
 
 - `full` — pose, grip, visible and remembered objects. A classical detection-and-mapping stack
   feeding a planner. Default; every existing scenario relies on it.
+- `detections` — pose, grip, and geometry without identity: *something* is there, this big, this
+  far, called `unknown_3` until a camera says otherwise. What a depth sensor or a lidar actually
+  returns, since neither can tell you a block is red.
 - `proprioceptive` — pose and grip only, which is what encoders and a gripper sensor give for
   free. Objects must be found with `look`, and memory lives in the model's context rather than the
   engine's world model. This is what a VLA actually gets, and the only mode that scales: a text
   manifest grows with the world, an image does not.
+
+**Detection and recognition are separate events.** The belief map records geometry the moment
+something enters the cone, and identity only when a camera has been pointed at it — `look` and
+`scan` call `model.recognise`, nothing else does. `full` mode names everything anyway, but that is
+a property of how the observation is *written*, not of the map: never grant identity inside
+`updatePerception`, or the mode in force when a scene happens to load decides what the robot knows.
+An unidentified belief keeps a stable `unknown_N` handle that works with `approach`, `face` and
+`pick_up`, and it goes on resolving after recognition, because the model may still be carrying it
+from an earlier turn.
 
 Rules that are easy to break:
 

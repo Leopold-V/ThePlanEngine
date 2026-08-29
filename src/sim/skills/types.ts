@@ -1,6 +1,8 @@
 import type { z } from 'zod'
 import type { Robot } from '../Robot.js'
 import type { WorldView } from '../WorldView.js'
+import type { Belief } from '../WorldModel.js'
+import type { WorldObject } from '../objects.js'
 
 export class AbortedError extends Error {
   constructor() {
@@ -63,6 +65,28 @@ export interface Skill<P> {
    */
   check?(robot: Robot, params: P, world: WorldView): string | null
   run(robot: Robot, params: P, ctx: SkillContext): Promise<SkillResult>
+}
+
+/**
+ * Turns the handle the model used into the thing behind it.
+ *
+ * The model refers to objects by whatever it is entitled to call them: the real
+ * id once a camera has recognised something, or an anonymous `unknown_3` while
+ * it has only been detected. Both have to work, or a robot could see a shape
+ * and be unable to walk over and find out what it is.
+ */
+export function resolveTarget(
+  world: WorldView,
+  label: string
+): { id: string; belief?: Belief; object?: WorldObject } {
+  const belief = world.model.byLabel(label)
+  const id = belief?.id ?? label
+  return { id, ...(belief ? { belief } : {}), ...(world.find(id) ? { object: world.find(id) } : {}) }
+}
+
+/** What the model may call the things it knows about, for a refusal message. */
+export function knownLabels(world: WorldView): string[] {
+  return world.model.all().map((b) => b.label)
 }
 
 /** Runs `fn` every frame until it returns true, or the budget expires. */

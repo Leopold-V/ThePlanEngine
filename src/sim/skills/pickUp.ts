@@ -1,9 +1,15 @@
 import { z } from 'zod'
 import { Robot } from '../Robot.js'
-import { type Skill, type SkillResult, wait } from './types.js'
+import { knownLabels, resolveTarget, type Skill, type SkillResult, wait } from './types.js'
 
 const schema = z.object({
-  object: z.string().min(1).describe('The id of the object to pick up, e.g. "red_block".')
+  object: z
+    .string()
+    .min(1)
+    .describe(
+      'What to pick up: an object id such as "red_block", or the handle of something you have ' +
+        'only detected, such as "unknown_2". You do not have to know what a thing is to lift it.'
+    )
 })
 
 export const pickUp: Skill<z.infer<typeof schema>> = {
@@ -22,11 +28,11 @@ export const pickUp: Skill<z.infer<typeof schema>> = {
       return `Already carrying ${robot.held.spec.id}. Put it down first.`
     }
 
-    const object = world.find(id)
+    const { object } = resolveTarget(world, id)
     if (!object) {
-      const known = world.model.all().map((b) => b.id)
+      const known = knownLabels(world)
       return known.length > 0
-        ? `No object called "${id}". Known objects: ${known.join(', ')}.`
+        ? `No object called "${id}". Known so far: ${known.join(', ')}.`
         : `No object called "${id}", and nothing has been seen yet. Try scan first.`
     }
 
@@ -44,9 +50,11 @@ export const pickUp: Skill<z.infer<typeof schema>> = {
   },
 
   async run(robot, { object: id }, ctx): Promise<SkillResult> {
-    const object = ctx.world.find(id)
+    const { object } = resolveTarget(ctx.world, id)
     if (!object) return { ok: false, observation: `${id} vanished before it could be picked up.` }
 
+    // Lifting it does not tell you what it is; only looking does. But it is in
+    // hand now, so name it by what the model called it.
     ctx.report(`Picking up ${id}`)
     ctx.world.grasp(object)
     // A beat so the carry transition is visible rather than instantaneous.
