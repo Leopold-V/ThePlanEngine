@@ -12,9 +12,18 @@ export const STORED_KEY = '__stored__'
  * openai-compatible adapter — only the baseURL differs.
  */
 export const DEFAULT_SETTINGS: Settings = {
-  activeProviderId: 'anthropic',
+  activeProviderId: 'claude-code',
   maxIterations: 10,
   providers: [
+    {
+      // Default because it needs no setup: it runs on an existing Claude Code
+      // login rather than an API key.
+      id: 'claude-code',
+      label: 'Claude Code (local login)',
+      kind: 'claude-cli',
+      model: 'sonnet',
+      requiresKey: false
+    },
     {
       id: 'anthropic',
       label: 'Anthropic',

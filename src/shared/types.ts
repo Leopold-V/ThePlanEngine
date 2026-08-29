@@ -74,7 +74,7 @@ export interface SendRequest {
  * Together, Hugging Face router, vLLM — anything that speaks the /chat/completions
  * shape — which is why there is no separate Ollama adapter.
  */
-export type ProviderKind = 'anthropic' | 'openai-compatible'
+export type ProviderKind = 'anthropic' | 'openai-compatible' | 'claude-cli'
 
 export interface ProviderSettings {
   id: string
@@ -84,6 +84,8 @@ export interface ProviderSettings {
   /** Omitted for the vendor default (Anthropic / OpenAI). */
   baseURL?: string
   apiKey?: string
+  /** `claude-cli` only: path to the Claude Code binary. Auto-detected when unset. */
+  command?: string
   /** Local servers (Ollama, LM Studio) need no key. */
   requiresKey: boolean
   /**

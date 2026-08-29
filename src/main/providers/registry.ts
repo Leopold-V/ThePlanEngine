@@ -1,11 +1,13 @@
 import type { ProviderKind } from '@shared/types.js'
 import { anthropicProvider } from './anthropic.js'
+import { claudeCliProvider } from './claudeCli.js'
 import { openAICompatibleProvider } from './openaiCompatible.js'
 import type { ModelProvider } from './types.js'
 
 const providers: Record<ProviderKind, ModelProvider> = {
   anthropic: anthropicProvider,
-  'openai-compatible': openAICompatibleProvider
+  'openai-compatible': openAICompatibleProvider,
+  'claude-cli': claudeCliProvider
 }
 
 export function getProvider(kind: ProviderKind): ModelProvider {

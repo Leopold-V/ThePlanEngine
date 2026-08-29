@@ -45,14 +45,40 @@ test on the planning side, where the interesting differences between models actu
 
 ## Providers
 
-Two adapters cover everything, because most vendors speak the OpenAI `/chat/completions` shape:
+Three adapters cover everything:
 
-- **`anthropic`** — Claude models
+- **`claude-cli`** — drives your locally installed **Claude Code**, so it runs on your existing
+  Claude Code login. **No API key.** This is the default.
+- **`anthropic`** — Claude via the API. Uses a pasted key, or falls back to `ANTHROPIC_API_KEY`
+  or an `ant auth login` profile if you leave the field blank.
 - **`openai-compatible`** — OpenAI, **Ollama**, LM Studio, Together, Hugging Face router, vLLM.
-  Only `baseURL` differs.
+  Only `baseURL` differs, which is why there is no separate Ollama adapter.
 
-Local models need no API key. Hosted keys are encrypted with your OS keychain via Electron
+Local models need no key at all. Hosted keys are encrypted with your OS keychain via Electron
 `safeStorage` and never reach the renderer process.
+
+### How the Claude Code provider works
+
+Claude Code has no flag for custom tool schemas, so tool calling is done by contract: the schemas
+go into the system prompt and the model is asked for a single JSON object. That keeps it inside
+the normal `ModelProvider` interface — the engine and the skills are untouched.
+
+It is invoked with hard isolation, and those flags are not optional:
+
+```
+--tools "" --strict-mcp-config --setting-sources ""
+```
+
+Without them Claude Code loads your plugins, skills and MCP servers into *every* call. Measured on
+one trivial instruction: **110k tokens and 16s** versus **0 tokens and 5s** with them — and it
+tried to call an unrelated MCP server mid-run. `--bare` looks like the right flag here and is not:
+it forces auth to `ANTHROPIC_API_KEY` and never reads the OAuth login, defeating the whole point.
+
+Expect ~5-9s per model call from process startup. Fine for a robot sim, not for a chat UI.
+
+> **Note on usage:** this drives Claude Code on your own machine, which is fine for local
+> development and testing. It is not a way to resell or share subscription access, and the
+> API providers above exist for anything beyond personal use.
 
 ## Running it
 
@@ -64,8 +90,9 @@ npm install
 npm run dev
 ```
 
-Then open **Settings**, pick a provider, and paste a key — or point it at Ollama on
-`http://localhost:11434/v1` and run entirely offline.
+If you already use Claude Code, it should work with **no setup at all** — the default provider
+finds your installation and uses your existing login. Otherwise open **Settings** and pick a
+provider.
 
 Try: *"Pace out a 4 metre square, then return to the origin and wave."*
 

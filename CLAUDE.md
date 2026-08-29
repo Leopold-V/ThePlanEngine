@@ -22,6 +22,27 @@ If a change would introduce one of those imports, the design is wrong — say so
 **API keys never reach the renderer.** The renderer sees the `STORED_KEY` sentinel. Model HTTP
 calls happen only in `src/main/providers/`.
 
+**Never pass an empty-string `apiKey` to a vendor SDK.** It is not the same as omitting it — an
+empty string wins its precedence slot and authenticates as an empty key, shadowing
+`ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, and any `ant auth login` profile. Spread the key in
+conditionally.
+
+## The Claude Code provider (`claude-cli`)
+
+Spawns the local Claude Code binary so the app runs on an existing login instead of an API key.
+Two things about it are load-bearing and easy to break:
+
+- **The isolation flags are mandatory:** `--tools "" --strict-mcp-config --setting-sources ""`.
+  Without them Claude Code loads the user's plugins, skills, and MCP servers into every call —
+  measured at 110k tokens / 16s versus 0 / 5s, and it will try to call unrelated MCP tools.
+- **Do not use `--bare`.** It looks ideal (skips hooks, plugins, CLAUDE.md discovery) but forces
+  auth to `ANTHROPIC_API_KEY` and never reads the OAuth login, which defeats the provider.
+
+On Windows only the npm shims are on PATH; the executable is at
+`<path-dir>/node_modules/@anthropic-ai/claude-code/bin/claude.exe`. Spawn that directly with
+`shell: false` — Node refuses to spawn the `.cmd` without a shell (EINVAL), and enabling the shell
+would put a multi-line system prompt through cmd.exe parsing.
+
 ## The two extension points
 
 Adding either should touch exactly two files. If a change requires editing `PlanEngine`, that is a

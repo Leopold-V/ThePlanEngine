@@ -65,6 +65,19 @@ export function SettingsPanel({ settings, onSave, onClose }: Props): React.JSX.E
                     ' Leave blank to use ANTHROPIC_API_KEY or an `ant auth login` profile.'}
                 </small>
               </label>
+            ) : active.kind === 'claude-cli' ? (
+              <label>
+                Claude Code command
+                <input
+                  value={active.command ?? ''}
+                  placeholder="auto-detected"
+                  onChange={(e) => patchActive({ command: e.target.value })}
+                />
+                <small>
+                  Runs your local Claude Code login — no API key. Leave blank to auto-detect
+                  the binary. Model accepts an alias: sonnet, opus, fable.
+                </small>
+              </label>
             ) : (
               <label>
                 Base URL
