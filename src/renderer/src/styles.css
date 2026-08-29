@@ -210,6 +210,13 @@ body {
   border-top: 1px solid var(--border);
 }
 
+/* Interject sits alongside Stop while a run is in progress. */
+.composer-actions {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.5rem;
+}
+
 textarea,
 input,
 select {

@@ -43,6 +43,13 @@ export class PlanEngine {
   private readonly queue: SkillQueue
   private messages: Message[] = []
   private controller: AbortController | null = null
+  /**
+   * Aborts the action in progress without ending the run. Separate from
+   * `controller`, which is Stop and means the whole thing is over.
+   */
+  private step: AbortController | null = null
+  /** Things the operator said while the robot was busy, not yet handed over. */
+  private pending: string[] = []
   /** Set from the resolved profile at the start of each run. */
   private detail: ObservationDetail = 'full'
 
@@ -135,16 +142,39 @@ export class PlanEngine {
           this.options.world.speak(reply.text, 'thought')
         }
 
-        // No tool calls means the model considers the task finished.
-        if (reply.toolCalls.length === 0) return { steps }
+        // No tool calls means the model considers the task finished — unless
+        // the operator spoke while it was replying, in which case it is not.
+        if (reply.toolCalls.length === 0) {
+          if (this.pending.length === 0) return { steps }
+          this.pushInterjectionOnly()
+          continue
+        }
 
         const results: ToolResultPart[] = []
+        // Anything the model decided before the operator spoke is already out
+        // of date. Every call still needs a result, though: an assistant turn
+        // with a tool call and no answer to it is a malformed conversation.
+        let stale = this.pending.length > 0
+
         for (const call of reply.toolCalls) {
           if (controller.signal.aborted) break
+
+          if (stale) {
+            this.emit('system', `Skipped ${call.name}() — you spoke first.`)
+            results.push({
+              type: 'tool_result',
+              id: call.id,
+              content: 'Not run: the operator interrupted before this started.',
+              isError: true
+            })
+            continue
+          }
+
+          this.step = new AbortController()
           this.emit('skill', formatCall(call.name, call.args))
           const result = await this.queue.execute(call, {
             report: (text) => this.emit('system', text),
-            signal: controller.signal,
+            signal: AbortSignal.any([controller.signal, this.step.signal]),
             allowed: enabled
           })
           this.emit('result', result.observation, result.ok)
@@ -155,7 +185,11 @@ export class PlanEngine {
             ...(result.image ? { image: result.image } : {}),
             isError: !result.ok
           })
+
+          // Said mid-action: abandon the rest of this plan too.
+          if (this.pending.length > 0) stale = true
         }
+        this.step = null
 
         if (controller.signal.aborted) {
           this.emit('system', 'Stopped.')
@@ -180,12 +214,41 @@ export class PlanEngine {
     } finally {
       this.options.world.robot.stop()
       this.controller = null
+      this.step = null
+      // Anything said in the dying moments of a run belongs to the next one.
+      this.pending = []
       this.options.onRunningChange(false)
     }
   }
 
   stop(): void {
     this.controller?.abort()
+  }
+
+  /**
+   * Says something to the robot while it is already working.
+   *
+   * The action in progress is abandoned rather than allowed to finish. Waiting
+   * eight seconds for a walk to complete before the robot hears "no, the blue
+   * one" is the behaviour that makes talking to it feel broken — and a plan
+   * made before you spoke is stale by the time it lands. Skills are already
+   * built to be abandoned safely; that is what Stop does.
+   */
+  interject(text: string): void {
+    const said = text.trim()
+    if (!said) return
+
+    this.emit('user', said)
+    this.pending.push(said)
+    // Only the current action, not the run.
+    this.step?.abort()
+  }
+
+  /** Hands over anything the operator said, and clears it. */
+  private takePending(): string[] {
+    const said = this.pending
+    this.pending = []
+    return said
   }
 
   /**
@@ -223,6 +286,7 @@ export class PlanEngine {
   reset(): void {
     this.stop()
     this.messages = []
+    this.pending = []
   }
 
   /**
@@ -232,9 +296,31 @@ export class PlanEngine {
   private pushResults(results: ToolResultPart[]): void {
     if (results.length === 0) return
     const observation = this.options.world.observationText(this.detail)
+    // Anything the operator said rides in the same message as the results,
+    // rather than following as a second user turn — providers expect the tool
+    // results to answer the assistant's calls without anything in between.
+    const said = this.takePending()
+    const text =
+      said.length > 0 ? `${observation}\n\n${quoteOperator(said)}` : observation
+
     this.messages.push({
       role: 'user',
-      parts: [...results, { type: 'text', text: observation }]
+      parts: [...results, { type: 'text', text }]
+    })
+    this.emit('observation', observation)
+  }
+
+  /**
+   * For an interjection that lands when the model made no tool calls, so there
+   * are no results for it to travel with.
+   */
+  private pushInterjectionOnly(): void {
+    const said = this.takePending()
+    if (said.length === 0) return
+    const observation = this.options.world.observationText(this.detail)
+    this.messages.push({
+      role: 'user',
+      parts: [{ type: 'text', text: `${quoteOperator(said)}\n\n[${observation}]` }]
     })
     this.emit('observation', observation)
   }
@@ -280,6 +366,16 @@ function withRecentImagesOnly(messages: Message[]): Message[] {
       return { ...rest, content: `${part.content} [earlier photo omitted]` }
     })
   }))
+}
+
+/**
+ * Marked as the operator speaking rather than dropped in as bare text, so the
+ * model treats it as a new instruction from the person watching and not as
+ * something it thought of itself.
+ */
+function quoteOperator(said: string[]): string {
+  const lines = said.map((line) => `"${line}"`).join(' ')
+  return `The operator interrupted you and said: ${lines}\nAct on this now; it replaces anything still outstanding from the previous instruction.`
 }
 
 function formatCall(name: string, args: Record<string, unknown>): string {

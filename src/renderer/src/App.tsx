@@ -74,9 +74,12 @@ export function App(): React.JSX.Element {
 
   const submit = (): void => {
     const instruction = input.trim()
-    if (!instruction || running || !engineRef.current) return
+    const engine = engineRef.current
+    if (!instruction || !engine) return
     setInput('')
-    void engineRef.current.run(instruction)
+    // Mid-run this redirects the robot instead of starting something new.
+    if (running) engine.interject(instruction)
+    else void engine.run(instruction)
   }
 
   const saveSettings = (next: Settings): void => {
@@ -196,9 +199,8 @@ export function App(): React.JSX.Element {
         <div className="composer">
           <textarea
             value={input}
-            placeholder="Tell the robot what to do…"
+            placeholder={running ? 'Say something — it will stop and listen…' : 'Tell the robot what to do…'}
             rows={3}
-            disabled={running}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
@@ -208,9 +210,14 @@ export function App(): React.JSX.Element {
             }}
           />
           {running ? (
-            <button className="danger" onClick={() => engineRef.current?.stop()}>
-              Stop
-            </button>
+            <div className="composer-actions">
+              <button className="primary" onClick={submit} disabled={!input.trim()}>
+                Interject
+              </button>
+              <button className="danger" onClick={() => engineRef.current?.stop()}>
+                Stop
+              </button>
+            </div>
           ) : (
             <button className="primary" onClick={submit} disabled={!input.trim()}>
               Send

@@ -227,6 +227,24 @@ from a hand-written one, which is what let terrain land without touching any of 
 - `move_forward` deliberately does *not* steer. It is the egocentric primitive and its contract is
   a straight line.
 
+## Interrupting a run
+
+`interject(text)` lets the operator speak while the robot is already working. Two abort scopes
+exist and must not be confused: `controller` is Stop and ends the run; `step` abandons only the
+action in progress. Skills are already built to be abandoned safely — that is what Stop does — so
+an interjection cancels what the robot is doing rather than letting it finish, because waiting out
+a walk before it hears "no, the blue one" is what makes talking to it feel broken.
+
+- **Every tool call must get a tool result**, including ones never run. An assistant turn carrying
+  a call with no answer to it is a malformed conversation and the next request fails. Cancelled
+  calls get an explicit "Not run" result.
+- **A plan decided before the operator spoke is stale**, so the rest of the batch is skipped rather
+  than executed late.
+- **The interjection rides in the same user message as the tool results**, not as a second user
+  turn: providers expect results to answer the assistant's calls with nothing in between.
+- `PlanEngine` takes `send` by injection, which is what lets `interject.test.ts` drive the whole
+  loop with no key, network or GPU. Preserve that seam.
+
 ## Scenarios and scoring
 
 A scenario is a document (`shared/scenario.ts`): scene, goal, and success criteria. Criteria are
