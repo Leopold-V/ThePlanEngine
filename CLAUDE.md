@@ -249,6 +249,16 @@ from a hand-written one, which is what let terrain land without touching any of 
 - **`avoiding` names what blocks the straight line**, not what the chosen heading hits — the
   chosen heading is by definition the clear one, so reading it there reports nothing on every
   successful detour.
+- **Footprints are rectangles, not circles.** A belief carries `halfX`/`halfZ` because the world
+  has walls in it: a 14m wall collapsed to a radius is a 7m circle covering ground it does not
+  occupy, which shoves the robot away from the gap it needs. Keep new obstacle maths on the box.
+- **Ties are broken by the heading the robot already has.** Faced with something dead ahead, left
+  and right score identically, and a stateless choice flips between them every frame while the
+  robot stands still. The commitment term is hysteresis, and it is true anyway — turning costs time.
+- **`trapped` is reported separately from stalling.** When every candidate is obstructed, the robot
+  still turns toward the least-bad one, which `walkTo` reads as a big turn and crawls at quarter
+  pace — so waiting for distance-based stalling means inching at a barrier for ten seconds before
+  anything notices. Steering says "no way through" directly.
 - **A concave trap defeats it, and should.** The stall detector reports and the model replans;
   that is the loop the app exists to exercise.
 - `move_forward` deliberately does *not* steer. It is the egocentric primitive and its contract is

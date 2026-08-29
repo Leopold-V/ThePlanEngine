@@ -11,8 +11,9 @@ export interface Belief {
   /** Where the robot last saw it — not where it necessarily is now. */
   x: number
   z: number
-  /** Horizontal half-extent as last seen. What navigation steers around. */
-  radius: number
+  /** Horizontal half-extents as last seen. What navigation steers around. */
+  halfX: number
+  halfZ: number
   /** Simulation seconds when the belief was last confirmed. */
   lastSeenAt: number
   /** True when the object is in view at this instant. */
@@ -59,7 +60,8 @@ export class WorldModel {
       if (existing) {
         existing.x = sighting.position.x
         existing.z = sighting.position.z
-        existing.radius = sighting.radius
+        existing.halfX = sighting.halfX
+        existing.halfZ = sighting.halfZ
         existing.lastSeenAt = now
         existing.visible = true
         continue
@@ -72,7 +74,8 @@ export class WorldModel {
         kind: sighting.kind,
         x: sighting.position.x,
         z: sighting.position.z,
-        radius: sighting.radius,
+        halfX: sighting.halfX,
+        halfZ: sighting.halfZ,
         lastSeenAt: now,
         visible: true,
         identified: false,

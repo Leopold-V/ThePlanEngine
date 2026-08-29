@@ -7,6 +7,8 @@ const ARRIVAL_RADIUS = 0.25
 const ALIGNED = 0.6
 /** Long enough to cover a turn on the spot, short enough to feel responsive. */
 const STALL_SECONDS = 2.5
+/** How long every direction may stay blocked before giving up on the route. */
+const TRAPPED_SECONDS = 1.4
 
 const schema = z.object({
   x: z.number().min(-40).max(40).describe('Target X coordinate in metres.'),
@@ -34,6 +36,7 @@ export const walkTo: Skill<z.infer<typeof schema>> = {
     const around = surroundingsFrom(ctx.world)
     const wentRound = new Set<string>()
     let blocked = false
+    let trappedFor = 0
 
     const arrived = await until(ctx, budget, () => {
       const remaining = robot.distanceTo(x, z)
@@ -45,6 +48,14 @@ export const walkTo: Skill<z.infer<typeof schema>> = {
 
       const steer = steerToward(robot, x, z, around)
       if (steer.avoiding) wentRound.add(steer.avoiding)
+
+      // Every direction obstructed. Give it a moment in case the way clears as
+      // the robot shifts, then stop rather than crawling into the barrier.
+      trappedFor = steer.trapped ? trappedFor + 1 / 60 : 0
+      if (trappedFor > TRAPPED_SECONDS) {
+        blocked = true
+        return true
+      }
 
       const angle = shortestAngle(robot.heading, steer.heading)
       robot.setTurn(Math.max(-1, Math.min(1, angle * 2)))

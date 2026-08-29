@@ -36,11 +36,22 @@ export interface Sighting {
    */
   elevation: number
   /**
-   * Horizontal half-extent, in metres. Seeing a thing tells you how wide it is,
+   * Horizontal half-extents, in metres. Seeing a thing tells you how big it is,
    * and navigation needs it: a 2.4m boulder has to be given a wider berth than
    * a 30cm crate.
+   *
+   * Two numbers rather than one, because a wall is five metres long and half a
+   * metre thick. Collapsed to a single radius it becomes a five-metre circle,
+   * and the robot swings around empty ground to avoid a barrier it could have
+   * walked close alongside.
    */
-  radius: number
+  halfX: number
+  halfZ: number
+}
+
+/** Worst-case half-extent, for the places that genuinely want one number. */
+export function footprintRadius(of: { halfX: number; halfZ: number }): number {
+  return Math.max(of.halfX, of.halfZ)
 }
 
 /** Roughly where a sensor would sit — used as the raycast origin. */
@@ -90,7 +101,8 @@ export function perceive(
       distance,
       bearingDeg,
       elevation: target.y - origin.y,
-      radius: Math.max(object.spec.size[0], object.spec.size[2]) / 2
+      halfX: object.spec.size[0] / 2,
+      halfZ: object.spec.size[2] / 2
     })
   }
 

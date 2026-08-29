@@ -1,6 +1,6 @@
 import type { Robot } from './Robot.js'
 import type { WorldModel } from './WorldModel.js'
-import type { Sighting } from './perception.js'
+import { footprintRadius, type Sighting } from './perception.js'
 
 export interface Observation {
   x: number
@@ -72,7 +72,7 @@ export function describe(
           const anonymous = !nameEverything && !b.identified
           return (
             `${anonymous ? b.label : b.id}` +
-            `${anonymous ? ` (${size(b.radius)} across, not identified)` : ''}` +
+            `${anonymous ? ` (${size(footprintRadius(b))} across, not identified)` : ''}` +
             ` at (${round(b.x)}, ${round(b.z)}), last seen ${Math.round(now - b.lastSeenAt)}s ago`
           )
         })
@@ -95,7 +95,8 @@ function describeSighting(s: Sighting, belief?: { label: string; identified: boo
       ? `, ${Math.abs(s.elevation).toFixed(1)}m ${s.elevation > 0 ? 'above' : 'below'} you`
       : ''
   const name = belief?.label ?? s.id
-  const unknown = belief && !belief.identified ? ` (${size(s.radius)} across, not identified)` : ''
+  const unknown =
+    belief && !belief.identified ? ` (${size(footprintRadius(s))} across, not identified)` : ''
   return (
     `${name}${unknown} at (${round(s.position.x)}, ${round(s.position.z)}) — ` +
     `${s.distance.toFixed(1)}m ${bearingWords(s.bearingDeg)}${height}`

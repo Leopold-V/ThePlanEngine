@@ -23,8 +23,9 @@ import type { WorldView } from './WorldView.js'
 export interface Obstacle {
   x: number
   z: number
-  /** Half-extent of the thing itself; clearance is added on top. */
-  radius: number
+  /** Half-extents of the thing itself; clearance is added on top. */
+  halfX: number
+  halfZ: number
   id: string
 }
 
@@ -41,6 +42,17 @@ export interface Steer {
   forward: number
   /** What forced the detour, if anything. For the observation, not the model. */
   avoiding: string | null
+  /**
+   * True when even the best direction is obstructed — no way through, only a
+   * least-bad way in.
+   *
+   * Worth reporting separately from distance. Waiting for progress to stop
+   * takes far longer than it should: with everything blocked the robot still
+   * turns toward the least-bad heading, which the caller reads as a big turn
+   * and crawls at quarter pace, so it inches at the barrier for ten seconds
+   * before the distance test notices it has got nowhere.
+   */
+  trapped: boolean
 }
 
 /** Body half-width plus a margin, so it rounds corners rather than scraping. */
@@ -53,9 +65,13 @@ const RELEVANT = 8
 const SLOPE_LIMIT = 0.8
 
 const OBSTACLE_WEIGHT = 6
+/** Extra cost, in metres-equivalent, for a route that goes through a thing. */
+const CROSSING = 1.5
 const SLOPE_WEIGHT = 4
 /** Per radian of deviation: enough to keep it honest about going straight. */
 const TURN_WEIGHT = 0.4
+/** Per radian away from the heading it already has. Breaks symmetric ties. */
+const COMMITMENT_WEIGHT = 0.3
 
 /**
  * Directions tried, either side of straight at the target.
@@ -81,11 +97,11 @@ export function steerToward(
   const reach = Math.min(LOOKAHEAD, Math.max(0.4, toTarget))
 
   const nearby = around.obstacles.filter(
-    (o) => Math.hypot(o.x - from.x, o.z - from.z) < RELEVANT
+    (o) => Math.hypot(o.x - from.x, o.z - from.z) - Math.max(o.halfX, o.halfZ) < RELEVANT
   )
   const groundHere = around.groundHeightAt(from.x, from.z)
 
-  let best = { heading: seek, cost: Infinity, offsetDeg: 0 }
+  let best = { heading: seek, cost: Infinity, offsetDeg: 0, blocked: false }
   // What is in the way of going straight at the target — which is the thing
   // being avoided. The chosen path is by definition the clear one, so reading
   // the answer off that would report nothing on every successful detour.
@@ -96,15 +112,24 @@ export function steerToward(
     const tipX = from.x + Math.sin(heading) * reach
     const tipZ = from.z + Math.cos(heading) * reach
 
-    let cost = Math.abs(offsetDeg) * (Math.PI / 180) * TURN_WEIGHT
+    // Deviation from the target, plus what it costs to swing round to it.
+    //
+    // The second term is hysteresis, and it earns its place: faced with an
+    // obstacle dead ahead, left and right score identically, and a stateless
+    // choice flips between them every frame while the robot stands still
+    // dithering. Preferring the heading it already has breaks the tie the same
+    // way each frame — and is true anyway, since turning takes time.
+    let cost =
+      Math.abs(offsetDeg) * (Math.PI / 180) * TURN_WEIGHT +
+      Math.abs(shortestAngle(robot.heading, heading)) * COMMITMENT_WEIGHT
     let worst: { id: string; penalty: number } | null = null
 
     for (const obstacle of nearby) {
-      const gap =
-        distanceToSegment(obstacle.x, obstacle.z, from.x, from.z, tipX, tipZ) -
-        (obstacle.radius + CLEARANCE)
-      if (gap >= 0) continue
-      const penalty = -gap * OBSTACLE_WEIGHT
+      const gap = segmentToBox(from.x, from.z, tipX, tipZ, obstacle)
+      if (gap >= CLEARANCE) continue
+      // Graded inside the clearance band, with a step for a route that would
+      // actually pass through the thing rather than merely close to it.
+      const penalty = (CLEARANCE - gap + (gap <= 1e-6 ? CROSSING : 0)) * OBSTACLE_WEIGHT
       cost += penalty
       if (!worst || penalty > worst.penalty) worst = { id: obstacle.id, penalty }
     }
@@ -116,7 +141,7 @@ export function steerToward(
     if (slope > SLOPE_LIMIT) cost += (slope - SLOPE_LIMIT) * SLOPE_WEIGHT
 
     if (offsetDeg === 0) inTheWay = worst?.id ?? null
-    if (cost < best.cost) best = { heading, cost, offsetDeg }
+    if (cost < best.cost) best = { heading, cost, offsetDeg, blocked: worst !== null }
   }
 
   // Swerving hard at full pace overshoots the turn and clips the thing being
@@ -127,7 +152,8 @@ export function steerToward(
   return {
     heading: best.heading,
     forward,
-    avoiding: best.offsetDeg === 0 ? null : inTheWay
+    avoiding: best.offsetDeg === 0 ? null : inTheWay,
+    trapped: best.blocked
   }
 }
 
@@ -143,7 +169,13 @@ export function surroundingsFrom(world: WorldView, ignore?: string): Surrounding
     obstacles: world.model
       .all()
       .filter((belief) => belief.id !== ignore)
-      .map((belief) => ({ id: belief.id, x: belief.x, z: belief.z, radius: belief.radius })),
+      .map((belief) => ({
+        id: belief.id,
+        x: belief.x,
+        z: belief.z,
+        halfX: belief.halfX,
+        halfZ: belief.halfZ
+      })),
     groundHeightAt: (x, z) => world.groundHeightAt(x, z)
   }
 }
@@ -153,6 +185,70 @@ export function shortestAngle(from: number, to: number): number {
   while (delta > Math.PI) delta -= Math.PI * 2
   while (delta < -Math.PI) delta += Math.PI * 2
   return delta
+}
+
+/**
+ * Closest approach of a probe to an axis-aligned footprint, in the ground plane.
+ *
+ * Rectangles rather than circles because the world has walls in it now. A five
+ * metre wall collapsed to a circle is a five metre circle: the robot swings
+ * around open ground to avoid a barrier it could have walked close alongside,
+ * and two segments of the same wall repel it from the gap between them.
+ *
+ * Returns 0 when the probe passes through the footprint. Otherwise the true
+ * distance, which for a segment and a rectangle is always achieved either at an
+ * end of the segment or at a corner of the box — both convex, so nothing in
+ * between can be closer.
+ */
+function segmentToBox(ax: number, az: number, bx: number, bz: number, box: Obstacle): number {
+  if (segmentCrossesBox(ax, az, bx, bz, box)) return 0
+
+  let best = Math.min(pointToBox(ax, az, box), pointToBox(bx, bz, box))
+  for (const cx of [box.x - box.halfX, box.x + box.halfX]) {
+    for (const cz of [box.z - box.halfZ, box.z + box.halfZ]) {
+      best = Math.min(best, distanceToSegment(cx, cz, ax, az, bx, bz))
+    }
+  }
+  return best
+}
+
+function pointToBox(px: number, pz: number, box: Obstacle): number {
+  const dx = Math.max(0, Math.abs(px - box.x) - box.halfX)
+  const dz = Math.max(0, Math.abs(pz - box.z) - box.halfZ)
+  return Math.hypot(dx, dz)
+}
+
+/** Slab test, clamped to the segment rather than run out to infinity. */
+function segmentCrossesBox(
+  ax: number,
+  az: number,
+  bx: number,
+  bz: number,
+  box: Obstacle
+): boolean {
+  let enter = 0
+  let leave = 1
+
+  const axes: [number, number, number, number][] = [
+    [ax, bx - ax, box.x, box.halfX],
+    [az, bz - az, box.z, box.halfZ]
+  ]
+
+  for (const [origin, delta, centre, half] of axes) {
+    if (Math.abs(delta) < 1e-9) {
+      // Parallel to this slab: either inside it for the whole segment or never.
+      if (Math.abs(origin - centre) > half) return false
+      continue
+    }
+    let near = (centre - half - origin) / delta
+    let far = (centre + half - origin) / delta
+    if (near > far) [near, far] = [far, near]
+    enter = Math.max(enter, near)
+    leave = Math.min(leave, far)
+    if (enter > leave) return false
+  }
+
+  return true
 }
 
 /** Closest approach of a point to a line segment, in the ground plane. */

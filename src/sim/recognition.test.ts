@@ -3,7 +3,7 @@ import { expect, it } from 'vitest'
 import { WorldModel } from './WorldModel.js'
 import type { Sighting } from './perception.js'
 
-function sighting(id: string, x: number, z: number, radius = 0.2): Sighting {
+function sighting(id: string, x: number, z: number, half = 0.2): Sighting {
   return {
     id,
     kind: 'block',
@@ -11,7 +11,8 @@ function sighting(id: string, x: number, z: number, radius = 0.2): Sighting {
     distance: Math.hypot(x, z),
     bearingDeg: 0,
     elevation: 0,
-    radius
+    halfX: half,
+    halfZ: half
   }
 }
 
@@ -61,6 +62,7 @@ it('geometry keeps updating for something never identified', () => {
   const belief = model.byLabel('unknown_1')
   expect(belief?.identified).toBe(false)
   expect(belief?.x).toBeCloseTo(2.5, 5)
-  // Radius is what steering needs, and detection alone provides it.
-  expect(belief?.radius).toBeCloseTo(0.9, 5)
+  // Extent is what steering needs, and detection alone provides it.
+  expect(belief?.halfX).toBeCloseTo(0.9, 5)
+  expect(belief?.halfZ).toBeCloseTo(0.9, 5)
 })

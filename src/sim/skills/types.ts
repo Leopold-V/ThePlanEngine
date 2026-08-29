@@ -2,6 +2,7 @@ import type { z } from 'zod'
 import type { Robot } from '../Robot.js'
 import type { WorldView } from '../WorldView.js'
 import type { Belief } from '../WorldModel.js'
+import { footprintRadius } from '../perception.js'
 import type { WorldObject } from '../objects.js'
 
 export class AbortedError extends Error {
@@ -117,7 +118,16 @@ export async function wait(ctx: SkillContext, seconds: number): Promise<void> {
  * and useless to plan against. Feed it the distance still to cover; it answers
  * true once that has failed to improve for `seconds`.
  */
-export function stalls(seconds: number, tolerance = 0.05): (remaining: number, dt: number) => boolean {
+export function stalls(
+  seconds: number,
+  /**
+   * Progress has to be worth something. A robot leaning on a wall creeps
+   * forward a centimetre at a time as the controller resolves the contact, and
+   * a small tolerance reads every twitch as progress — so it presses against
+   * the barrier for twice as long before admitting it is stuck.
+   */
+  tolerance = 0.25
+): (remaining: number, dt: number) => boolean {
   let best = Infinity
   let stalled = 0
   return (remaining, dt) => {
@@ -152,7 +162,7 @@ export function obstacleAhead(ctx: SkillContext, within = 2.5): string | null {
   if (!closest) {
     const robot = ctx.world.robot
     for (const belief of ctx.world.model.all()) {
-      const distance = robot.distanceTo(belief.x, belief.z) - belief.radius
+      const distance = robot.distanceTo(belief.x, belief.z) - footprintRadius(belief)
       if (distance > within) continue
       if (!closest || distance < closest.distance) {
         closest = { id: belief.id, distance: Math.max(0, distance) }

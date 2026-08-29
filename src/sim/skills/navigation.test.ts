@@ -49,7 +49,8 @@ function scene(...specs: ObjectSpec[]): {
     distance: Math.hypot(spec.position[0], spec.position[2]),
     bearingDeg: 0,
     elevation: spec.size[1] / 2,
-    radius: Math.max(spec.size[0], spec.size[2]) / 2
+    halfX: spec.size[0] / 2,
+    halfZ: spec.size[2] / 2
   }))
 
   // The robot has looked and remembers them. Those beliefs are all steering may use.
@@ -168,6 +169,27 @@ it('threads through a cluster without oscillating', async () => {
   // Dithering would burn the budget; a route through should not be far off
   // the straight-line time of ~8s.
   expect(seconds).toBeLessThan(16)
+})
+
+it('rounds the end of a long wall instead of fleeing its centre', async () => {
+  // 14m long, half a metre thick. Treated as a circle this is a 7m radius
+  // centred on (0,4) — an obstacle covering ground it does not occupy, which
+  // shoves the robot away from the very gap it needs.
+  const { physics, robot, ctx, pump } = scene(obstacleSpec('boulder_1', [14, 2, 0.5], [0, 4]))
+
+  const { result, seconds } = await drive(
+    walkTo.run(robot, { x: 10, z: 8 }, ctx),
+    robot,
+    physics,
+    pump
+  )
+
+  console.log(`past the wall in ${seconds.toFixed(1)}s:`, result.observation)
+  expect(result.ok).toBe(true)
+  expect(robot.distanceTo(10, 8)).toBeLessThan(0.4)
+  // It had to go round the end, so it is longer than the 12.8m straight line —
+  // but nothing like the sweep a phantom 7m circle would have forced.
+  expect(seconds).toBeLessThan(28)
 })
 
 it('stalls() reports only after progress genuinely stops', () => {
