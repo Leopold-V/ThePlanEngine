@@ -1,0 +1,37 @@
+{
+  "name": "the-plan-engine",
+  "version": "0.1.0",
+  "description": "Test AI models as embodied agents: give a model a humanoid robot in a simulated 3D world and watch it plan.",
+  "main": "./out/main/index.js",
+  "author": "Leopold-V",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json && electron-vite build",
+    "start": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "package": "npm run build && electron-builder"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.68.0",
+    "openai": "^6.10.0",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@dimforge/rapier3d-compat": "^0.20.0",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "@types/three": "^0.181.0",
+    "@vitejs/plugin-react": "^5.0.4",
+    "electron": "^38.4.0",
+    "electron-builder": "^25.1.8",
+    "electron-vite": "^4.0.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "three": "^0.181.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.12"
+  }
+}
