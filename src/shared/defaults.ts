@@ -39,6 +39,14 @@ export const DEFAULT_SETTINGS: Settings = {
       requiresKey: true
     },
     {
+      id: 'grok',
+      label: 'xAI Grok',
+      kind: 'openai-compatible',
+      model: 'grok-4.6',
+      baseURL: 'https://api.x.ai/v1',
+      requiresKey: true
+    },
+    {
       id: 'ollama',
       label: 'Ollama (local)',
       kind: 'openai-compatible',

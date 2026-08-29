@@ -51,8 +51,8 @@ Three adapters cover everything:
   Claude Code login. **No API key.** This is the default.
 - **`anthropic`** — Claude via the API. Uses a pasted key, or falls back to `ANTHROPIC_API_KEY`
   or an `ant auth login` profile if you leave the field blank.
-- **`openai-compatible`** — OpenAI, **Ollama**, LM Studio, Together, Hugging Face router, vLLM.
-  Only `baseURL` differs, which is why there is no separate Ollama adapter.
+- **`openai-compatible`** — OpenAI, **xAI Grok**, **Ollama**, LM Studio, Together, Hugging Face
+  router, vLLM. Only `baseURL` differs, which is why there is no separate adapter for any of them.
 
 Local models need no key at all. Hosted keys are encrypted with your OS keychain via Electron
 `safeStorage` and never reach the renderer process.
