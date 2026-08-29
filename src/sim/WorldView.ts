@@ -23,6 +23,8 @@ export interface WorldView {
   find(id: string): WorldObject | undefined
   /** Renders the robot's eye view, with visible objects labelled. */
   capture(): CameraFrame | null
+  /** Says a line out loud in the world, above the robot's head. */
+  say(text: string): void
   grasp(object: WorldObject): void
   /** Releases the held object at a ground position. Returns what was dropped. */
   release(x: number, z: number): WorldObject | null

@@ -58,6 +58,35 @@ body {
   color: var(--danger);
 }
 
+/* Above the speech layer, which the simulation owns and sets to z-index 2. */
+.camera-modes {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  display: flex;
+  gap: 0.35rem;
+  z-index: 3;
+}
+
+.camera-modes .chip {
+  padding: 0.25rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(16, 20, 30, 0.82);
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.camera-modes .chip:hover {
+  color: var(--text);
+}
+
+.camera-modes .chip.active {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
 /* --- panel --------------------------------------------------------------- */
 
 .panel {

@@ -125,7 +125,12 @@ export class PlanEngine {
           this.messages.push({ role: 'assistant', parts: assistantParts })
         }
 
-        if (reply.text) this.emit('assistant', reply.text)
+        if (reply.text) {
+          this.emit('assistant', reply.text)
+          // Narration belongs where the operator is looking. Marked as thought
+          // rather than speech, so it never reads as the robot talking aloud.
+          this.options.world.speak(reply.text, 'thought')
+        }
 
         // No tool calls means the model considers the task finished.
         if (reply.toolCalls.length === 0) return { steps }

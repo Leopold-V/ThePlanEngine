@@ -30,9 +30,10 @@ observation ("Arrived at (0.02, -0.11).") ──► back to the model
   └──► model calls more tools, or replies in plain text and the task ends
 ```
 
-The model never touches joint angles. It plans in terms of **skills** — `walk_to`, `turn`,
-`look_at`, `scan`, `pick_up`, `put_down`, `wave`, `say` — and the simulation solves the motion.
-That keeps the variable under test on the planning side, where the interesting differences
+The model never touches joint angles. It plans in terms of **skills** — `walk_to`, `turn` and
+`look_at` in world coordinates, `move_forward`, `approach`, `face` and `jump` relative to itself,
+`scan` and `look` to sense, `pick_up`, `put_down`, `wave` and `say` — and the simulation solves the
+motion. That keeps the variable under test on the planning side, where the interesting differences
 between models actually are.
 
 ### Perception
@@ -183,7 +184,10 @@ v0.1 is the loop. The reason the project exists is what comes after it.
       fingerprint, and pass rates grouped by scenario, configuration and model
 - [x] **v0.4** — vision: a `look()` skill returning a labelled camera frame, egocentric actions,
       and a proprioceptive sensing mode where objects must be found rather than listed
-- [ ] **v0.5** — recording and replay; deterministic reruns
+- [x] **v0.5** — a robot worth watching: a camera that follows, first person through its own eyes,
+      speech above its head, the photo it just took, and motion with weight
+- [ ] **v0.6** — somewhere to go: terrain, ledges and props, so `jump` has more than one table
+- [ ] **v0.7** — recording and replay; deterministic reruns
 
 ## Contributing
 

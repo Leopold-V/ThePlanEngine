@@ -1,7 +1,13 @@
 # The Plan Engine — Claude instructions
 
-Electron desktop app for testing AI models as embodied agents: a model receives an instruction,
-decomposes it into robot skills, and a humanoid executes them in a three.js + Rapier simulation.
+Electron desktop app where a model receives an instruction, decomposes it into robot skills, and a
+humanoid executes them in a three.js + Rapier simulation.
+
+**It is a toy, not a benchmark.** The point is that giving a robot instructions, talking to it, and
+watching it move through a world is fun. Scoring exists so a task can have a win condition, and
+model choice exists because swapping brains is the interesting part — neither is there to produce
+a research table. When weighing what to build, favour what is enjoyable to watch and to talk to
+over what is measurable.
 
 Design spec: [docs/specs/2026-08-29-plan-engine-mvp.md](docs/specs/2026-08-29-plan-engine-mvp.md).
 
@@ -120,6 +126,27 @@ Rules that are easy to break:
   every turn, so without it a ten-step task carries ten screenshots on every request.
 - Providers differ: Anthropic takes an image inside a tool result, OpenAI-compatible needs a
   following user message, and `claude-cli` cannot carry one at all and says so.
+
+## The show layer
+
+`CameraRig`, `Hud` and the animation half of `Robot` exist so the simulation is watchable. Three
+things there are load-bearing:
+
+- **Anything rendered from inside the head goes through `World.fromInsideTheHead`.** Both the
+  `look` photo and the live `pov` camera sit inside the robot's own mesh, with the field-of-view
+  wedge across the lens. They share one helper so the two cannot drift apart — this bug has now
+  been fixed twice.
+- **`Hud` styles itself inline and owns its own DOM.** No stylesheet dependency, so `sim/` stays
+  droppable into any host page. It also must not wait on `requestAnimationFrame` to start a
+  transition: a bubble raised while the loop is paused would never appear.
+- **Framing runs on the frame delta, not the fixed step.** Camera work is direction, not
+  simulation, and stays smooth however physics is pacing.
+
+Animation never touches the collider. Lean, bank, crouch and gaze are mesh rotations only, so
+nothing cosmetic can push the robot around or trip it.
+
+The camera takes a `CameraSubject` per frame and the HUD keys bubbles by owner, so pointing either
+at a second robot with a different model is an argument rather than a rewrite.
 
 ## Scenarios and scoring
 

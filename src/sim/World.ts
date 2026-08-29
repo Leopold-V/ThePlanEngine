@@ -1,9 +1,10 @@
 import * as THREE from 'three'
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import RAPIER from '@dimforge/rapier3d-compat'
 import { Robot } from './Robot.js'
 import { WorldModel } from './WorldModel.js'
+import { CameraRig, type CameraMode } from './CameraRig.js'
 import { CameraView } from './CameraView.js'
+import { Hud, type BubbleTone } from './Hud.js'
 import { DebugVisuals } from './debugVisuals.js'
 import { describe } from './observe.js'
 import { DEFAULT_SCENE, WorldObject, type SceneDefinition } from './objects.js'
@@ -42,11 +43,12 @@ function initRapier(): Promise<void> {
  */
 export class World {
   readonly scene: THREE.Scene
-  readonly camera: THREE.PerspectiveCamera
   readonly robot: Robot
   readonly objects: WorldObject[] = []
   readonly model = new WorldModel()
 
+  private readonly rig: CameraRig
+  private readonly hud: Hud
   private readonly debug = new DebugVisuals()
   private readonly cameraView = new CameraView()
   private perceptionConfig: PerceptionConfig = DEFAULT_PERCEPTION
@@ -55,7 +57,6 @@ export class World {
   private sincePerception = 0
 
   private readonly renderer: THREE.WebGLRenderer
-  private readonly controls: OrbitControls
   private readonly physics: RAPIER.World
   private readonly tickers = new Set<Ticker>()
   private readonly resizeObserver: ResizeObserver
@@ -75,18 +76,13 @@ export class World {
     this.scene.background = new THREE.Color(0x0b0d12)
     this.scene.fog = new THREE.Fog(0x0b0d12, 22, 48)
 
-    this.camera = new THREE.PerspectiveCamera(52, 1, 0.1, 200)
-    this.camera.position.set(4.5, 3.4, 6)
+    this.rig = new CameraRig(canvas)
+    this.hud = new Hud(canvas)
 
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     this.renderer.shadowMap.enabled = true
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
-
-    this.controls = new OrbitControls(this.camera, canvas)
-    this.controls.enableDamping = true
-    this.controls.target.set(0, 1, 0)
-    this.controls.maxPolarAngle = Math.PI / 2 - 0.05
 
     this.addLighting()
     this.addGround()
@@ -123,8 +119,33 @@ export class World {
   setPerception(config: PerceptionConfig): void {
     this.perceptionConfig = config
     this.debug.setPerception(config)
+    // First person shows the same cone the model is told about, so what the
+    // operator sees in that mode is genuinely what the robot has.
+    this.rig.setPovFov(config.halfAngleDeg * 2)
     // Re-sense immediately so the next observation reflects the new sensor.
     this.updatePerception()
+  }
+
+  /** The active camera, for anything that needs to project into the view. */
+  get camera(): THREE.PerspectiveCamera {
+    return this.rig.camera
+  }
+
+  get cameraMode(): CameraMode {
+    return this.rig.current
+  }
+
+  setCameraMode(mode: CameraMode): void {
+    this.rig.setMode(mode)
+  }
+
+  /**
+   * Puts a line above the robot's head. `speech` is the robot talking out loud
+   * through the `say` skill; `thought` is the model's narration to the operator,
+   * kept visually distinct so the two are never confused.
+   */
+  speak(text: string, tone: BubbleTone = 'speech'): void {
+    this.hud.say('robot', text, () => this.robot.headPosition, tone)
   }
 
   /** Toggles the field-of-view overlay. Purely a view concern. */
@@ -156,17 +177,30 @@ export class World {
       : describe(this.robot, this.model, this.sightings, this.simTime)
   }
 
-  /** Renders the robot's eye view. Off-screen and on demand. */
-  capture(): CameraFrame | null {
-    // The operator's debug overlay is not part of the world, and the camera
-    // sits inside the robot's own head — neither belongs in the photo. A
-    // carried object stays visible, because you do see what you are holding.
+  /**
+   * Renders with the robot's own body and the operator's overlay hidden.
+   *
+   * Both the photograph and the live first-person view are taken from inside
+   * the head, where the robot's own mesh fills the frame and the field-of-view
+   * wedge covers everything else. A carried object stays visible, because you
+   * do see what you are holding. Shared by both so they cannot drift apart.
+   */
+  private fromInsideTheHead<T>(render: () => T): T {
     const debugWasVisible = this.debug.group.visible
     this.debug.group.visible = false
     this.robot.mesh.visible = false
-
     try {
-      return this.cameraView.capture(
+      return render()
+    } finally {
+      this.robot.mesh.visible = true
+      this.debug.group.visible = debugWasVisible
+    }
+  }
+
+  /** Renders the robot's eye view. Off-screen and on demand. */
+  capture(): CameraFrame | null {
+    return this.fromInsideTheHead(() => {
+      const frame = this.cameraView.capture(
         this.renderer,
         this.scene,
         this.robot,
@@ -174,10 +208,14 @@ export class World {
         this.sightings,
         this.perceptionConfig
       )
-    } finally {
-      this.robot.mesh.visible = true
-      this.debug.group.visible = debugWasVisible
-    }
+      // The model gets this frame either way; showing it is what lets the
+      // operator see the one moment the robot does something visual.
+      this.hud.flashPhoto(
+        `data:${frame.mediaType};base64,${frame.base64}`,
+        frame.labelled.length > 0 ? frame.labelled.join(' · ') : 'nothing recognised'
+      )
+      return frame
+    })
   }
 
   /**
@@ -202,6 +240,7 @@ export class World {
       perception: this.perceptionConfig,
       find: (id) => this.objects.find((o) => o.spec.id === id),
       capture: () => this.capture(),
+      say: (text) => this.speak(text, 'speech'),
       grasp: (object) => this.grasp(object),
       release: (x, z) => this.release(x, z)
     }
@@ -224,6 +263,7 @@ export class World {
 
     this.robot.teleport(start.x, start.z, THREE.MathUtils.degToRad(start.headingDeg))
     this.model.clear()
+    this.hud.clear()
     this.sightings = []
     this.updatePerception()
   }
@@ -267,6 +307,15 @@ export class World {
       this.perceptionConfig
     )
     this.model.update(this.sightings, this.simTime)
+
+    // The head follows the nearest thing it can actually see — not what it is
+    // holding, which would just make it stare at its own hands.
+    let watching: Sighting | null = null
+    for (const sighting of this.sightings) {
+      if (sighting.id === this.robot.held?.spec.id) continue
+      if (!watching || sighting.distance < watching.distance) watching = sighting
+    }
+    this.robot.setGaze(watching ? watching.position.clone() : null)
 
     if (this.debug.group.visible) {
       const visible = new Set(this.sightings.map((s) => s.id))
@@ -326,8 +375,15 @@ export class World {
       for (const object of this.objects) object.syncMesh()
       this.debug.update(this.robot.position, this.robot.heading)
 
-      this.controls.update()
-      this.renderer.render(this.scene, this.camera)
+      // Framing runs on the frame delta, not the fixed step: it is direction,
+      // not simulation, and it should stay smooth however physics is pacing.
+      this.rig.update(delta, this.robot)
+      if (this.rig.current === 'pov') {
+        this.fromInsideTheHead(() => this.renderer.render(this.scene, this.rig.camera))
+      } else {
+        this.renderer.render(this.scene, this.rig.camera)
+      }
+      this.hud.update(this.rig.camera)
     }
     this.frameHandle = requestAnimationFrame(loop)
   }
@@ -338,7 +394,8 @@ export class World {
     this.disposed = true
     cancelAnimationFrame(this.frameHandle)
     this.resizeObserver.disconnect()
-    this.controls.dispose()
+    this.rig.dispose()
+    this.hud.dispose()
     this.debug.dispose()
     this.renderer.dispose()
     this.physics.free()
@@ -347,9 +404,10 @@ export class World {
   private resize(canvas: HTMLCanvasElement): void {
     const width = canvas.clientWidth || 1
     const height = canvas.clientHeight || 1
-    this.camera.aspect = width / height
-    this.camera.updateProjectionMatrix()
+    this.rig.setAspect(width / height)
     this.renderer.setSize(width, height, false)
+    // Cached so bubble projection never has to read layout per frame.
+    this.hud.setSize(width, height)
   }
 
   private addLighting(): void {

@@ -1,8 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { World } from '@sim/World.js'
+import type { CameraMode } from '@sim/CameraRig.js'
 
 interface Props {
   onReady: (world: World) => void
+}
+
+const CAMERA_LABELS: Record<CameraMode, string> = {
+  follow: 'Follow',
+  orbit: 'Free',
+  pov: 'Robot eyes'
 }
 
 /**
@@ -11,8 +18,10 @@ interface Props {
  */
 export function Viewport({ onReady }: Props): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const worldRef = useRef<World | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [mode, setMode] = useState<CameraMode>('follow')
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -29,8 +38,10 @@ export function Viewport({ onReady }: Props): React.JSX.Element {
           return
         }
         world = created
+        worldRef.current = created
         created.start()
         setLoading(false)
+        setMode(created.cameraMode)
         onReady(created)
       })
       .catch((err: unknown) => {
@@ -41,13 +52,34 @@ export function Viewport({ onReady }: Props): React.JSX.Element {
 
     return () => {
       cancelled = true
+      worldRef.current = null
       world?.dispose()
     }
   }, [onReady])
 
+  const choose = (next: CameraMode): void => {
+    worldRef.current?.setCameraMode(next)
+    setMode(next)
+  }
+
   return (
     <div className="viewport">
       <canvas ref={canvasRef} />
+
+      {!loading && !error && (
+        <div className="camera-modes">
+          {(Object.keys(CAMERA_LABELS) as CameraMode[]).map((option) => (
+            <button
+              key={option}
+              className={option === mode ? 'chip active' : 'chip'}
+              onClick={() => choose(option)}
+            >
+              {CAMERA_LABELS[option]}
+            </button>
+          ))}
+        </div>
+      )}
+
       {loading && <div className="viewport-overlay">Starting simulation…</div>}
       {error && <div className="viewport-overlay error">Simulation failed: {error}</div>}
     </div>

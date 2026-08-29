@@ -14,6 +14,9 @@ export const say: Skill<z.infer<typeof schema>> = {
   schema,
 
   async run(_robot, { text }, ctx): Promise<SkillResult> {
+    // Out loud means in the world. The transcript keeps the full line; the
+    // bubble is what makes it the robot speaking rather than a log entry.
+    ctx.world.say(text)
     ctx.report(`Robot says: "${text}"`)
     return { ok: true, observation: `Said: "${text}"` }
   }

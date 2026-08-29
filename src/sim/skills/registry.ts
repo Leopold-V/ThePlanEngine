@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { approach } from './approach.js'
 import { face } from './face.js'
+import { jump } from './jump.js'
 import { look } from './look.js'
 import { lookAt } from './lookAt.js'
 import { moveForward } from './moveForward.js'
@@ -30,6 +31,7 @@ export const SKILLS: Skill<any>[] = [
   // Egocentric movement, for when the robot is working from photographs and has
   // no absolute frame to name.
   moveForward,
+  jump,
   approach,
   face,
   // Perception.
