@@ -4,7 +4,9 @@
  * `WorldObject` that wraps a spec stays in `sim/`.
  */
 
-export type ObjectKind = 'block' | 'table' | 'marker'
+import type { TerrainSpec } from './terrain.js'
+
+export type ObjectKind = 'block' | 'table' | 'marker' | 'boulder'
 
 export interface ObjectSpec {
   /** The handle the model uses. Keep it readable: `red_block`, not `obj_7`. */
@@ -25,10 +27,36 @@ export interface ObjectSpec {
   fixed?: boolean
 }
 
+/**
+ * A world described by the seed that produces it rather than by its contents.
+ *
+ * The whole point of storing this instead of an object list: a generated
+ * landscape is thousands of numbers, and a scenario has to stay a small,
+ * readable, reproducible document. Same spec, same world, always — which is
+ * what keeps a run record attributable to a world you can regenerate.
+ */
+export interface WorldGenSpec {
+  seed: number
+  /** Metres from centre to edge. */
+  halfExtent: number
+  /** 0 is flat, 1 rolling, 2 dramatic. */
+  hilliness: number
+  /** Roughly how many props per 100m². */
+  density: number
+}
+
+/**
+ * Scene contents. Either enumerated (`objects`) or generated (`generate`) —
+ * never both. `resolveScene` in `worldgen.ts` collapses the two into the same
+ * shape, so nothing downstream needs to know which kind it was handed.
+ */
 export interface SceneDefinition {
   id: string
   name: string
-  objects: ObjectSpec[]
+  objects?: ObjectSpec[]
+  generate?: WorldGenSpec
+  /** Absent means the flat plane every scene written before terrain assumes. */
+  terrain?: TerrainSpec
 }
 
 const table = (position: [number, number, number]): ObjectSpec => ({
@@ -59,10 +87,24 @@ const block = (
 export const BLOCK_COLORS = { red: 0xe0524d, blue: 0x4c7dff, green: 0x38d39f } as const
 
 /**
- * Objects are spread well beyond a single field of view, so finding them is a
- * real part of the task rather than a formality.
+ * The world the app opens in: generated, so there is somewhere to go and
+ * something to climb rather than a plane with five things on it.
+ *
+ * Four numbers, and they rebuild it identically anywhere. Change the seed for a
+ * different world.
  */
 export const DEFAULT_SCENE: SceneDefinition = {
+  id: 'wilds',
+  name: 'Generated wilds',
+  generate: { seed: 1337, halfExtent: 30, hilliness: 1, density: 1.1 }
+}
+
+/**
+ * The flat world every scenario written before terrain assumes. Kept because
+ * their criteria were tuned against it, and because a level plane is still the
+ * right place to test planning without navigation getting in the way.
+ */
+export const FLAT_SCENE: SceneDefinition = {
   id: 'blocks-and-table',
   name: 'Blocks and a table',
   objects: [

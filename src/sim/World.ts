@@ -5,6 +5,9 @@ import { WorldModel } from './WorldModel.js'
 import { CameraRig, type CameraMode } from './CameraRig.js'
 import { CameraView } from './CameraView.js'
 import { Hud, type BubbleTone } from './Hud.js'
+import { Terrain } from './Terrain.js'
+import { resolveScene } from '@shared/worldgen.js'
+import type { TerrainSpec } from '@shared/terrain.js'
 import { DebugVisuals } from './debugVisuals.js'
 import { describe } from './observe.js'
 import { DEFAULT_SCENE, WorldObject, type SceneDefinition } from './objects.js'
@@ -15,6 +18,8 @@ import type { ObservationDetail } from '@shared/profile.js'
 import type { CameraFrame } from './CameraView.js'
 
 const GROUND_HALF_EXTENT = 25
+/** Half-width of the shadow box carried along with the robot. */
+const SHADOW_FRUSTUM = 16
 const FIXED_STEP = 1 / 60
 /** Never simulate more than this per frame, so a stalled tab can't spiral. */
 const MAX_FRAME_DELTA = 0.1
@@ -49,6 +54,7 @@ export class World {
 
   private readonly rig: CameraRig
   private readonly hud: Hud
+  private terrain: Terrain | null = null
   private readonly debug = new DebugVisuals()
   private readonly cameraView = new CameraView()
   private perceptionConfig: PerceptionConfig = DEFAULT_PERCEPTION
@@ -57,6 +63,7 @@ export class World {
   private sincePerception = 0
 
   private readonly renderer: THREE.WebGLRenderer
+  private key!: THREE.DirectionalLight
   private readonly physics: RAPIER.World
   private readonly tickers = new Set<Ticker>()
   private readonly resizeObserver: ResizeObserver
@@ -85,17 +92,8 @@ export class World {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
 
     this.addLighting()
-    this.addGround()
 
     this.physics = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
-    this.physics.createCollider(
-      RAPIER.ColliderDesc.cuboid(GROUND_HALF_EXTENT, 0.1, GROUND_HALF_EXTENT).setTranslation(
-        0,
-        -0.1,
-        0
-      )
-    )
-
     this.robot = new Robot(RAPIER, this.physics)
     this.scene.add(this.robot.mesh)
 
@@ -261,7 +259,14 @@ export class World {
 
     this.loadScene(scene)
 
-    this.robot.teleport(start.x, start.z, THREE.MathUtils.degToRad(start.headingDeg))
+    // The scene is loaded first, so the start pose lands on the new ground
+    // rather than at the old world's height.
+    this.robot.teleport(
+      start.x,
+      start.z,
+      THREE.MathUtils.degToRad(start.headingDeg),
+      this.groundHeightAt(start.x, start.z)
+    )
     this.model.clear()
     this.hud.clear()
     this.sightings = []
@@ -290,12 +295,38 @@ export class World {
     }
   }
 
+  /**
+   * Ground height at a point. Anything placing something on the ground must ask
+   * rather than assume zero — the world has not been flat since v0.6.
+   */
+  groundHeightAt(x: number, z: number): number {
+    return this.terrain?.heightAt(x, z) ?? 0
+  }
+
+  /** Metres from the centre of the world to its edge. */
+  get halfExtent(): number {
+    return this.terrain?.spec.halfExtent ?? GROUND_HALF_EXTENT
+  }
+
   private loadScene(scene: SceneDefinition): void {
-    for (const spec of scene.objects) {
+    // Enumerated or generated, this is where the two become the same thing.
+    const resolved = resolveScene(scene)
+
+    this.terrain?.dispose(this.scene, this.physics)
+    this.terrain = new Terrain(resolved.terrain, RAPIER, this.physics)
+    this.terrain.addTo(this.scene)
+    this.applyFog(resolved.terrain)
+
+    for (const spec of resolved.objects) {
       const object = new WorldObject(spec, RAPIER, this.physics)
       this.objects.push(object)
       this.scene.add(object.mesh)
     }
+  }
+
+  /** Keeps the far haze just past the edge, whatever size the world is. */
+  private applyFog(spec: TerrainSpec): void {
+    this.scene.fog = new THREE.Fog(0x0b0d12, spec.halfExtent * 0.9, spec.halfExtent * 2.2)
   }
 
   private updatePerception(): void {
@@ -374,6 +405,7 @@ export class World {
 
       for (const object of this.objects) object.syncMesh()
       this.debug.update(this.robot.position, this.robot.heading)
+      this.followWithLight()
 
       // Framing runs on the frame delta, not the fixed step: it is direction,
       // not simulation, and it should stay smooth however physics is pacing.
@@ -396,6 +428,7 @@ export class World {
     this.resizeObserver.disconnect()
     this.rig.dispose()
     this.hud.dispose()
+    this.terrain?.dispose(this.scene, this.physics)
     this.debug.dispose()
     this.renderer.dispose()
     this.physics.free()
@@ -417,27 +450,30 @@ export class World {
     key.castShadow = true
     key.shadow.mapSize.set(2048, 2048)
     key.shadow.camera.near = 1
-    key.shadow.camera.far = 40
-    const frustum = 14
+    key.shadow.camera.far = 60
+    const frustum = SHADOW_FRUSTUM
     key.shadow.camera.left = -frustum
     key.shadow.camera.right = frustum
     key.shadow.camera.top = frustum
     key.shadow.camera.bottom = -frustum
     this.scene.add(key)
+    this.scene.add(key.target)
+    this.key = key
   }
 
-  private addGround(): void {
-    const plane = new THREE.Mesh(
-      new THREE.PlaneGeometry(GROUND_HALF_EXTENT * 2, GROUND_HALF_EXTENT * 2),
-      new THREE.MeshStandardMaterial({ color: 0x141824, roughness: 0.95, metalness: 0 })
-    )
-    plane.rotation.x = -Math.PI / 2
-    plane.receiveShadow = true
-    this.scene.add(plane)
-
-    // The grid is the model's only spatial reference, so keep it legible.
-    const grid = new THREE.GridHelper(GROUND_HALF_EXTENT * 2, GROUND_HALF_EXTENT * 2, 0x4c7dff, 0x232838)
-    grid.position.y = 0.01
-    this.scene.add(grid)
+  /**
+   * Walks the key light along with the robot.
+   *
+   * A single fixed shadow camera cannot cover a 60m world at a useful
+   * resolution: stretched to fit it, shadows turn to mush, and left small it
+   * draws a hard edge across the ground where its frustum stops. Moving it
+   * keeps a tight, sharp box around wherever anyone is actually looking.
+   */
+  private followWithLight(): void {
+    const p = this.robot.position
+    this.key.position.set(p.x + 6, p.y + 10, p.z + 5)
+    this.key.target.position.set(p.x, p.y, p.z)
+    this.key.target.updateMatrixWorld()
   }
+
 }

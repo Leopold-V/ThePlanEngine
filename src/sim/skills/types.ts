@@ -83,3 +83,38 @@ export async function wait(ctx: SkillContext, seconds: number): Promise<void> {
   let elapsed = 0
   while (elapsed < seconds) elapsed += await ctx.nextFrame()
 }
+
+/**
+ * Notices when a skill has stopped getting anywhere.
+ *
+ * Since the world grew obstacles, walking into one is the ordinary failure, and
+ * a timeout is a bad way to report it: the robot stands against a boulder for
+ * fifteen seconds and then says it ran out of time, which is both dull to watch
+ * and useless to plan against. Feed it the distance still to cover; it answers
+ * true once that has failed to improve for `seconds`.
+ */
+export function stalls(seconds: number, tolerance = 0.05): (remaining: number, dt: number) => boolean {
+  let best = Infinity
+  let stalled = 0
+  return (remaining, dt) => {
+    if (remaining < best - tolerance) {
+      best = remaining
+      stalled = 0
+      return false
+    }
+    stalled += dt
+    return stalled >= seconds
+  }
+}
+
+/** The nearest thing in front of the robot — the likely culprit when stuck. */
+export function obstacleAhead(ctx: SkillContext, within = 2): string | null {
+  let closest: { id: string; distance: number } | null = null
+  for (const sighting of ctx.world.sightings) {
+    if (Math.abs(sighting.bearingDeg) > 50 || sighting.distance > within) continue
+    if (!closest || sighting.distance < closest.distance) {
+      closest = { id: sighting.id, distance: sighting.distance }
+    }
+  }
+  return closest ? `${closest.id} is ${closest.distance.toFixed(1)}m ahead` : null
+}

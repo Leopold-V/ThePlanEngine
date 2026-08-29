@@ -36,6 +36,22 @@ The model never touches joint angles. It plans in terms of **skills** — `walk_
 motion. That keeps the variable under test on the planning side, where the interesting differences
 between models actually are.
 
+### The world
+
+The ground is generated from a seed, not hand-placed. A scene document is four numbers —
+
+```ts
+generate: { seed: 1337, halfExtent: 30, hilliness: 1, density: 1.1 }
+```
+
+— and those four rebuild the identical landscape, with the same crate under the same hill, on any
+machine. That is what lets a scenario stay a small readable document while the world it describes
+is a 60m landscape, and what keeps a result attributable to a world you can regenerate rather than
+one that happened to be on disk.
+
+Generated or hand-written, the two collapse to the same `ObjectSpec[]` before anything sees them,
+so perception, scoring and the snapshot cannot tell which they were handed.
+
 ### Perception
 
 The robot has a **field of view**, not omniscience. It sees what is in front of it, within range,
@@ -186,7 +202,8 @@ v0.1 is the loop. The reason the project exists is what comes after it.
       and a proprioceptive sensing mode where objects must be found rather than listed
 - [x] **v0.5** — a robot worth watching: a camera that follows, first person through its own eyes,
       speech above its head, the photo it just took, and motion with weight
-- [ ] **v0.6** — somewhere to go: terrain, ledges and props, so `jump` has more than one table
+- [x] **v0.6** — a generated world: seeded procedural terrain and props, slopes the robot walks
+      over, elevation in what it senses, and locomotion that says what blocked it
 - [ ] **v0.7** — recording and replay; deterministic reruns
 
 ## Contributing

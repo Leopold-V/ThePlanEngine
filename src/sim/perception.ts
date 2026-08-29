@@ -23,10 +23,18 @@ export interface Sighting {
   id: string
   kind: ObjectKind
   position: THREE.Vector3
-  /** Metres from the robot. */
+  /** Metres from the robot, measured flat — range is a ground-plane distance. */
   distance: number
   /** Degrees from the robot's heading. Negative is left, positive is right. */
   bearingDeg: number
+  /**
+   * Metres the object's centre sits above (positive) or below the robot's feet.
+   *
+   * On a flat world this was always zero and could be left unsaid. On terrain it
+   * is the difference between a thing the robot can walk to and a thing it has
+   * to climb, and no other part of the observation carries it.
+   */
+  elevation: number
 }
 
 /** Roughly where a sensor would sit — used as the raycast origin. */
@@ -73,7 +81,8 @@ export function perceive(
       kind: object.spec.kind,
       position: target,
       distance,
-      bearingDeg
+      bearingDeg,
+      elevation: target.y - origin.y
     })
   }
 

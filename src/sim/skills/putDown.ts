@@ -3,8 +3,8 @@ import { Robot } from '../Robot.js'
 import { type Skill, type SkillResult, wait } from './types.js'
 
 const schema = z.object({
-  x: z.number().min(-24).max(24).describe('X coordinate to place the object at.'),
-  z: z.number().min(-24).max(24).describe('Z coordinate to place the object at.')
+  x: z.number().min(-40).max(40).describe('X coordinate to place the object at.'),
+  z: z.number().min(-40).max(40).describe('Z coordinate to place the object at.')
 })
 
 export const putDown: Skill<z.infer<typeof schema>> = {

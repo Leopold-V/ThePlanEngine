@@ -11,6 +11,9 @@ const WALK_SPEED = 1.4
 const TURN_SPEED = Math.PI // rad/s
 /** Keeps the feet on the floor over bumps and down small steps. */
 const SNAP_DISTANCE = 0.3
+/** Steeper than this cannot be walked up; steeper than the second, it slides. */
+const MAX_CLIMB_ANGLE = Math.PI / 4
+const MIN_SLIDE_ANGLE = Math.PI * 0.3
 
 // --- how the motion reads, none of which touches the collider ---------------
 /** Reaches walking pace in about a quarter of a second: enough to read as mass. */
@@ -50,28 +53,6 @@ export class Robot {
   private readonly rightLeg: THREE.Group
   private readonly head: THREE.Group
 
-  /**
-   * Above this the robot is somewhere it should not be able to reach: autostep
-   * is capped at 0.3m, so anything higher means the character controller climbed
-   * something it should have been blocked by. Jumping makes height legitimate,
-   * which is why the detector stands down once the robot has left the floor on
-   * purpose — see `jumped`.
-   */
-  private static readonly CLIMB_ANOMALY_HEIGHT = 0.4
-
-  /**
-   * Captured the first frame the robot ends up impossibly high, with whatever
-   * the controller collided with on that frame. Reproducing the climb has so
-   * far failed, so the next occurrence needs to explain itself.
-   */
-  climbReport: {
-    height: number
-    position: { x: number; z: number }
-    headingDeg: number
-    holding: string | null
-    collisions: { colliderHandle: number; normal: { x: number; y: number; z: number } }[]
-  } | null = null
-
   private forwardInput = 0
   private turnInput = 0
   private waving = false
@@ -81,9 +62,6 @@ export class Robot {
   /** Horizontal speed carried through a jump; there is nothing to push against. */
   private launchSpeed = 0
   private airborne_ = false
-  /** Set by the first jump since a reset, to silence the climb detector. */
-  private jumped = false
-
   // Motion the eye reads rather than the physics: the collider stays upright
   // and moves at whatever `speed` says, while these shape how that looks.
   private speed = 0
@@ -119,6 +97,10 @@ export class Robot {
     this.controller.enableAutostep(0.3, 0.2, true)
     this.controller.enableSnapToGround(SNAP_DISTANCE)
     this.controller.setApplyImpulsesToDynamicBodies(true)
+    // Left at the defaults, hills are either unclimbable or frictionless. A
+    // slope the robot can walk up has to be a decision, not an accident.
+    this.controller.setMaxSlopeClimbAngle(MAX_CLIMB_ANGLE)
+    this.controller.setMinSlopeSlideAngle(MIN_SLIDE_ANGLE)
   }
 
   /** Exposed so perception can exclude the robot from its own line-of-sight rays. */
@@ -183,7 +165,6 @@ export class Robot {
       Robot.MAX_LAUNCH_SPEED
     )
     this.airborne_ = true
-    this.jumped = true
     // Snap-to-ground exists to hold the feet down over bumps. Left on, it pulls
     // the robot straight back out of the jump on the frame it starts.
     this.controller.disableSnapToGround()
@@ -225,12 +206,14 @@ export class Robot {
     this.heldObject = object
   }
 
-  /** Places the robot at a starting pose. Used when a scenario resets the world. */
-  teleport(x: number, z: number, heading: number): void {
+  /**
+   * Places the robot at a starting pose. Used when a scenario resets the world.
+   * `groundY` is the terrain height at the spot — without it the robot spawns
+   * buried in a hill or several metres above a valley.
+   */
+  teleport(x: number, z: number, heading: number, groundY = 0): void {
     this.stop()
     this.land()
-    this.climbReport = null
-    this.jumped = false
     this.heading = heading
     this.verticalVelocity = 0
     this.gait = 0
@@ -241,8 +224,8 @@ export class Robot {
     this.gazeTarget = null
     // Clear any lean left over from the previous run's last movement.
     this.mesh.rotation.set(0, heading, 0)
-    this.body.setTranslation({ x, y: CENTER_HEIGHT, z }, true)
-    this.body.setNextKinematicTranslation({ x, y: CENTER_HEIGHT, z })
+    this.body.setTranslation({ x, y: groundY + CENTER_HEIGHT, z }, true)
+    this.body.setNextKinematicTranslation({ x, y: groundY + CENTER_HEIGHT, z })
     this.syncMesh(0, 0)
   }
 
@@ -349,8 +332,6 @@ export class Robot {
       }
     }
 
-    this.captureClimbAnomaly()
-
     const t = this.body.translation()
     this.body.setNextKinematicTranslation({
       x: t.x + moved.x,
@@ -367,31 +348,6 @@ export class Robot {
 
     // The legs ease to rest in mid-air rather than walking through the arc.
     this.syncMesh(dt, this.airborne_ ? 0 : Math.abs(speed))
-  }
-
-  /** Records what the controller hit the first time the robot is impossibly high. */
-  private captureClimbAnomaly(): void {
-    if (this.climbReport || this.jumped) return
-    const height = this.body.translation().y - CENTER_HEIGHT
-    if (height <= Robot.CLIMB_ANOMALY_HEIGHT) return
-
-    const collisions: { colliderHandle: number; normal: { x: number; y: number; z: number } }[] = []
-    for (let i = 0; i < this.controller.numComputedCollisions(); i++) {
-      const collision = this.controller.computedCollision(i)
-      if (collision?.collider) {
-        collisions.push({ colliderHandle: collision.collider.handle, normal: collision.normal1 })
-      }
-    }
-
-    const p = this.position
-    this.climbReport = {
-      height: Number(height.toFixed(3)),
-      position: { x: Number(p.x.toFixed(2)), z: Number(p.z.toFixed(2)) },
-      headingDeg: Number(this.headingDegrees.toFixed(0)),
-      holding: this.heldObject?.spec.id ?? null,
-      collisions
-    }
-    console.warn('[plan-engine] robot reached an impossible height', this.climbReport)
   }
 
   private syncMesh(dt: number, speed: number): void {

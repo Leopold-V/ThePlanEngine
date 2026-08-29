@@ -145,5 +145,26 @@ export const BUILT_IN_SCENARIOS: Scenario[] = [
       { type: 'object_upright', object: 'marker_post' },
       { type: 'holding', object: null }
     ]
+  },
+  {
+    // The first scenario set in a generated world. The scene is four numbers
+    // rather than a list of objects, and they rebuild the same landscape —
+    // same hills, same crate in the same place — on any machine, which is what
+    // keeps the result comparable.
+    id: 'fetch-from-the-wilds',
+    name: 'Fetch from the wilds',
+    goal:
+      'Somewhere out in the landscape there is a crate called crate_1. Find it, carry it back ' +
+      'to the clearing at the centre of the world, and put it down there.',
+    scene: {
+      id: 'wilds-fetch',
+      name: 'Generated wilds',
+      generate: { seed: 4242, halfExtent: 26, hilliness: 1, density: 0.9 }
+    },
+    start: { x: 0, z: 0, headingDeg: 0 },
+    criteria: [
+      { type: 'object_near', object: 'crate_1', x: 0, z: 0, within: 4 },
+      { type: 'holding', object: null }
+    ]
   }
 ]

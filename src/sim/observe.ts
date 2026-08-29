@@ -30,9 +30,10 @@ export function observe(robot: Robot): Observation {
  */
 export function describe(robot: Robot, model?: WorldModel, sightings?: Sighting[], now = 0): string {
   const o = observe(robot)
-  // Height is reported only when off the ground: now that there are objects to
-  // stand on, "am I elevated?" is something the planner cannot otherwise know.
-  const elevation = robot.position.y > 0.1 ? `, standing ${robot.position.y.toFixed(2)}m up` : ''
+  // Height above the world's base plane. On terrain this is how the robot knows
+  // whether it is on high or low ground, which nothing else in the report says.
+  const elevation =
+    Math.abs(robot.position.y) > 0.1 ? `, at height ${robot.position.y.toFixed(2)}m` : ''
   const lines = [
     `Robot at (${o.x}, ${o.z}) facing ${o.heading}°${elevation}. ` +
       `Holding: ${o.holding ?? 'nothing'}.`
@@ -60,9 +61,15 @@ export function describe(robot: Robot, model?: WorldModel, sightings?: Sighting[
 }
 
 function describeSighting(s: Sighting): string {
+  // Only when it matters: on level ground this would be noise on every line,
+  // and the observation is resent every turn.
+  const height =
+    Math.abs(s.elevation) >= 0.4
+      ? `, ${Math.abs(s.elevation).toFixed(1)}m ${s.elevation > 0 ? 'above' : 'below'} you`
+      : ''
   return (
     `${s.id} at (${round(s.position.x)}, ${round(s.position.z)}) — ` +
-    `${s.distance.toFixed(1)}m ${bearingWords(s.bearingDeg)}`
+    `${s.distance.toFixed(1)}m ${bearingWords(s.bearingDeg)}${height}`
   )
 }
 

@@ -1,0 +1,127 @@
+import * as THREE from 'three'
+import type RAPIER from '@dimforge/rapier3d-compat'
+import {
+  buildHeightField,
+  isFlat,
+  sampledHeightAt,
+  type HeightField,
+  type TerrainSpec
+} from '@shared/terrain.js'
+
+/**
+ * The ground: one heightfield collider and the mesh that matches it.
+ *
+ * A flat world is not a special case, just a spec with zero amplitude, so there
+ * is a single code path and the scenes written before terrain existed keep
+ * behaving exactly as they did.
+ */
+export class Terrain {
+  readonly mesh: THREE.Mesh
+  readonly grid: THREE.GridHelper | null
+  private readonly field: HeightField
+  private readonly collider: RAPIER.Collider
+
+  constructor(
+    readonly spec: TerrainSpec,
+    rapier: typeof RAPIER,
+    physics: RAPIER.World
+  ) {
+    this.field = buildHeightField(spec)
+    const size = this.field.size
+
+    const geometry = new THREE.PlaneGeometry(size, size, this.field.nrows, this.field.ncols)
+    geometry.rotateX(-Math.PI / 2)
+
+    // Each vertex is displaced by looking up its own world position rather than
+    // by index arithmetic. Slower to build, but it cannot silently transpose.
+    const position = geometry.attributes.position as THREE.BufferAttribute
+    for (let i = 0; i < position.count; i++) {
+      position.setY(i, sampledHeightAt(this.field, position.getX(i), position.getZ(i)))
+    }
+    position.needsUpdate = true
+    geometry.computeVertexNormals()
+    paintByHeight(geometry, position)
+
+    this.mesh = new THREE.Mesh(
+      geometry,
+      new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 })
+    )
+    this.mesh.receiveShadow = true
+
+    // The grid is the only spatial reference in a photograph, but laid over
+    // hills it slices through them, so it belongs to flat worlds only.
+    this.grid = isFlat(spec)
+      ? new THREE.GridHelper(size, Math.round(size), 0x4c7dff, 0x232838)
+      : null
+    if (this.grid) this.grid.position.y = 0.01
+
+    this.collider = physics.createCollider(
+      rapier.ColliderDesc.heightfield(this.field.nrows, this.field.ncols, this.field.heights, {
+        x: size,
+        y: 1,
+        z: size
+      })
+    )
+  }
+
+  /**
+   * Ground height at a point. Anything that puts an object on the ground must
+   * go through this rather than assuming zero.
+   */
+  heightAt(x: number, z: number): number {
+    return sampledHeightAt(this.field, x, z)
+  }
+
+  addTo(scene: THREE.Scene): void {
+    scene.add(this.mesh)
+    if (this.grid) scene.add(this.grid)
+  }
+
+  dispose(scene: THREE.Scene, physics: RAPIER.World): void {
+    scene.remove(this.mesh)
+    if (this.grid) {
+      scene.remove(this.grid)
+      this.grid.dispose()
+    }
+    this.mesh.geometry.dispose()
+    ;(this.mesh.material as THREE.Material).dispose()
+    physics.removeCollider(this.collider, false)
+  }
+}
+
+/** Valley floor, and the tone the high ground fades to. */
+const LOW = new THREE.Color(0x141824)
+const HIGH = new THREE.Color(0x39415a)
+
+/**
+ * Shades the ground from low to high.
+ *
+ * Not decoration: an unshaded landscape is a flat dark field in the robot's own
+ * camera, which is the one view that has to carry depth. Lighting alone does
+ * not do it — the key light rakes across at a fixed angle, so a slope facing
+ * away from it is indistinguishable from a valley.
+ */
+function paintByHeight(geometry: THREE.BufferGeometry, position: THREE.BufferAttribute): void {
+  let lowest = Infinity
+  let highest = -Infinity
+  for (let i = 0; i < position.count; i++) {
+    const y = position.getY(i)
+    if (y < lowest) lowest = y
+    if (y > highest) highest = y
+  }
+
+  const range = highest - lowest
+  const colors = new Float32Array(position.count * 3)
+  const shade = new THREE.Color()
+
+  for (let i = 0; i < position.count; i++) {
+    // A flat world has no range to map, so it stays the single base tone.
+    const t = range < 0.01 ? 0 : (position.getY(i) - lowest) / range
+    shade.copy(LOW).lerp(HIGH, t)
+    colors[i * 3] = shade.r
+    colors[i * 3 + 1] = shade.g
+    colors[i * 3 + 2] = shade.b
+  }
+
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+}

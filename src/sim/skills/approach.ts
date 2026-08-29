@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { Robot } from '../Robot.js'
-import { type Skill, type SkillResult, until } from './types.js'
+import { obstacleAhead, stalls, type Skill, type SkillResult, until } from './types.js'
 
 const schema = z.object({
   object: z.string().min(1).describe('The id of the object to walk up to, as labelled in a photo.')
@@ -39,9 +39,16 @@ export const approach: Skill<z.infer<typeof schema>> = {
     ctx.report(`Approaching ${id}`)
     const budget = robot.distanceTo(tx, tz) / 1.4 + 8
 
+    const stalled = stalls(2.5)
+    let blocked = false
+
     const arrived = await until(ctx, budget, () => {
       const remaining = robot.distanceTo(tx, tz)
       if (remaining <= STANDOFF) return true
+      if (stalled(remaining, 1 / 60)) {
+        blocked = true
+        return true
+      }
       const angle = robot.angleTo(tx, tz)
       robot.setTurn(Math.max(-1, Math.min(1, angle * 2)))
       robot.setForward(Math.abs(angle) < 0.6 ? 1 : 0.25)
@@ -53,6 +60,17 @@ export const approach: Skill<z.infer<typeof schema>> = {
     // Where it actually is now, which may differ from where the robot believed.
     const actual = ctx.world.find(id)?.position
     const distance = actual ? robot.distanceTo(actual.x, actual.z) : Infinity
+
+    if (blocked) {
+      const culprit = obstacleAhead(ctx)
+      return {
+        ok: false,
+        observation:
+          `Stopped making progress toward ${id}, still ${distance.toFixed(2)}m from it. ` +
+          `${culprit ? `${culprit}. ` : 'Nothing is visible ahead, so it may be a steep slope. '}` +
+          'Try going round it.'
+      }
+    }
 
     if (!arrived) {
       return {

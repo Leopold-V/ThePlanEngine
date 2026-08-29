@@ -148,6 +148,29 @@ nothing cosmetic can push the robot around or trip it.
 The camera takes a `CameraSubject` per frame and the HUD keys bubbles by owner, so pointing either
 at a second robot with a different model is an argument rather than a rewrite.
 
+## The world is generated, not enumerated
+
+A scene document is either an object list or a `WorldGenSpec` — never both — and
+`resolveScene` in `shared/worldgen.ts` collapses the two before anything downstream sees them.
+Keep it that way: perception, criteria and the snapshot must stay unable to tell a generated world
+from a hand-written one, which is what let terrain land without touching any of them.
+
+- **Never store generated contents back into a scene.** The spec is the document; the landscape is
+  derived. Same reason profiles are sparse — a scenario has to stay small and reproducible, and a
+  50m landscape is ten thousand numbers.
+- **Rapier's heightfield rows run along z, columns along x** — the transpose of the obvious
+  reading. Getting it backwards yields a landscape that looks entirely plausible and is mirrored
+  about the diagonal relative to its own collider, so the robot walks into invisible hills. This
+  is pinned by `Terrain.test.ts`, which raycasts the collider and compares; it is verified, not
+  reasoned about.
+- **`sampledHeightAt` approximates the collider, it does not match it.** Rapier triangulates each
+  cell while it interpolates bilinearly — a few centimetres apart inside a cell. Anything placed
+  on the ground is dropped from slightly above and left to settle.
+- **Ask `world.groundHeightAt(x, z)`; never assume zero.** `robot.teleport` takes the ground
+  height for this reason.
+- Criteria are all *relative* — an object's base against a named surface's top, horizontal
+  distances — so non-flat ground does not affect scoring. Keep new predicates relative too.
+
 ## Scenarios and scoring
 
 A scenario is a document (`shared/scenario.ts`): scene, goal, and success criteria. Criteria are
