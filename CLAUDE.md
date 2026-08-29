@@ -171,6 +171,27 @@ from a hand-written one, which is what let terrain land without touching any of 
 - Criteria are all *relative* — an object's base against a named surface's top, horizontal
   distances — so non-flat ground does not affect scoring. Keep new predicates relative too.
 
+## Navigation steers, it does not plan
+
+`sim/steering.ts`. The rules here are what keep it honest rather than merely effective:
+
+- **Obstacles come from `world.model` (beliefs), never `world.objects` (truth).** A navmesh over
+  the whole world would let the robot route around something it has never seen, which contradicts
+  the field of view, the belief map and proprioceptive mode. If a change needs ground truth to
+  navigate, it is the wrong change.
+- **Ground is probed one step ahead and no further.** Feeling the slope you are about to step on
+  is proprioception; querying distant ground is sight, and sight is earned with `look`.
+- **Directional sampling, not a repulsion field.** A repulsion vector from an obstacle dead ahead
+  is exactly opposite the seek vector; they cancel and the robot walks calmly into it. Scoring
+  discrete candidate headings has no such degenerate case.
+- **`avoiding` names what blocks the straight line**, not what the chosen heading hits — the
+  chosen heading is by definition the clear one, so reading it there reports nothing on every
+  successful detour.
+- **A concave trap defeats it, and should.** The stall detector reports and the model replans;
+  that is the loop the app exists to exercise.
+- `move_forward` deliberately does *not* steer. It is the egocentric primitive and its contract is
+  a straight line.
+
 ## Scenarios and scoring
 
 A scenario is a document (`shared/scenario.ts`): scene, goal, and success criteria. Criteria are

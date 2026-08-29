@@ -107,14 +107,34 @@ export function stalls(seconds: number, tolerance = 0.05): (remaining: number, d
   }
 }
 
-/** The nearest thing in front of the robot — the likely culprit when stuck. */
-export function obstacleAhead(ctx: SkillContext, within = 2): string | null {
+/**
+ * The nearest thing in the robot's way — the likely culprit when stuck.
+ *
+ * Sightings first, since they are current. But a robot that has been sliding
+ * along a wall trying to get round it has that wall beside it rather than in
+ * front, so it falls back to the belief map, which still remembers where the
+ * thing is even when it is no longer in the cone.
+ */
+export function obstacleAhead(ctx: SkillContext, within = 2.5): string | null {
   let closest: { id: string; distance: number } | null = null
+
   for (const sighting of ctx.world.sightings) {
-    if (Math.abs(sighting.bearingDeg) > 50 || sighting.distance > within) continue
+    if (Math.abs(sighting.bearingDeg) > 60 || sighting.distance > within) continue
     if (!closest || sighting.distance < closest.distance) {
       closest = { id: sighting.id, distance: sighting.distance }
     }
   }
-  return closest ? `${closest.id} is ${closest.distance.toFixed(1)}m ahead` : null
+
+  if (!closest) {
+    const robot = ctx.world.robot
+    for (const belief of ctx.world.model.all()) {
+      const distance = robot.distanceTo(belief.x, belief.z) - belief.radius
+      if (distance > within) continue
+      if (!closest || distance < closest.distance) {
+        closest = { id: belief.id, distance: Math.max(0, distance) }
+      }
+    }
+  }
+
+  return closest ? `${closest.id} is ${closest.distance.toFixed(1)}m away` : null
 }

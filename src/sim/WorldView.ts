@@ -21,6 +21,11 @@ export interface WorldView {
   now: number
   perception: PerceptionConfig
   find(id: string): WorldObject | undefined
+  /**
+   * Ground height at a point. Navigation probes this a step ahead, which is
+   * what feet and an IMU sense; asking about distant ground would be sight.
+   */
+  groundHeightAt(x: number, z: number): number
   /** Renders the robot's eye view, with visible objects labelled. */
   capture(): CameraFrame | null
   /** Says a line out loud in the world, above the robot's head. */

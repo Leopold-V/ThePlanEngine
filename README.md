@@ -66,6 +66,23 @@ Visible: table at (5, 1) — 3.0m to the right.
 Remembered: blue_block at (-4, 2), last seen 2s ago; green_block at (-2, -5), last seen 3s ago.
 ```
 
+### Navigation
+
+There is no navmesh and no A*. Both would let the robot path neatly around a boulder it has never
+seen, which would quietly undo the field of view, the belief map and the whole of proprioceptive
+mode. So it steers instead, from the objects it has actually had in view, probing the ground only
+a step ahead — what feet and an IMU give you for free.
+
+The trade is deliberate and it shows: a robot that charges off blind has an empty map and walks
+into things, and one that has looked around moves smoothly through them. Navigation quality
+follows perception quality. Local steering also cannot escape a concave trap, and is not meant to
+— it reports what stopped it and the model replans.
+
+```
+Arrived at (0.05, 10.78). Went around boulder_1, boulder_2, boulder_4 on the way.
+Blocked 7.23m short of the target — stopped making progress. boulder_1 is 0.0m away.
+```
+
 ## Stack
 
 | Layer | Choice | Why |
@@ -204,7 +221,10 @@ v0.1 is the loop. The reason the project exists is what comes after it.
       speech above its head, the photo it just took, and motion with weight
 - [x] **v0.6** — a generated world: seeded procedural terrain and props, slopes the robot walks
       over, elevation in what it senses, and locomotion that says what blocked it
-- [ ] **v0.7** — recording and replay; deterministic reruns
+- [x] **v0.7** — navigation from the belief map: steering around what it has actually seen,
+      slope avoidance by local probing, and arrivals that name what they went around
+- [ ] **v0.8** — talking to it mid-task: interrupt and redirect a run in progress
+- [ ] **v0.9** — recording and replay; deterministic reruns
 
 ## Contributing
 

@@ -11,6 +11,8 @@ export interface Belief {
   lastSeenAt: number
   /** True when the object is in view at this instant. */
   visible: boolean
+  /** Horizontal half-extent as last seen. What navigation steers around. */
+  radius: number
 }
 
 /**
@@ -36,7 +38,8 @@ export class WorldModel {
         x: sighting.position.x,
         z: sighting.position.z,
         lastSeenAt: now,
-        visible: true
+        visible: true,
+        radius: sighting.radius
       })
     }
   }

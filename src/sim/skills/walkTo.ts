@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { shortestAngle, steerToward, surroundingsFrom } from '../steering.js'
 import { obstacleAhead, stalls, type Skill, type SkillResult, until } from './types.js'
 
 const ARRIVAL_RADIUS = 0.25
@@ -30,6 +31,8 @@ export const walkTo: Skill<z.infer<typeof schema>> = {
     ctx.report(`Walking to (${x}, ${z}) — ${startDistance.toFixed(1)}m away`)
 
     const stalled = stalls(STALL_SECONDS)
+    const around = surroundingsFrom(ctx.world)
+    const wentRound = new Set<string>()
     let blocked = false
 
     const arrived = await until(ctx, budget, () => {
@@ -39,9 +42,13 @@ export const walkTo: Skill<z.infer<typeof schema>> = {
         blocked = true
         return true
       }
-      const angle = robot.angleTo(x, z)
+
+      const steer = steerToward(robot, x, z, around)
+      if (steer.avoiding) wentRound.add(steer.avoiding)
+
+      const angle = shortestAngle(robot.heading, steer.heading)
       robot.setTurn(Math.max(-1, Math.min(1, angle * 2)))
-      robot.setForward(Math.abs(angle) < ALIGNED ? 1 : 0.25)
+      robot.setForward(Math.abs(angle) < ALIGNED ? steer.forward : 0.25)
       return false
     })
 
@@ -50,7 +57,14 @@ export const walkTo: Skill<z.infer<typeof schema>> = {
     const at = `Now at (${final.x.toFixed(2)}, ${final.z.toFixed(2)})`
 
     if (arrived && !blocked) {
-      return { ok: true, observation: `Arrived at (${final.x.toFixed(2)}, ${final.z.toFixed(2)}).` }
+      // Naming the detour is worth the words: it tells the model where the
+      // world is cluttered without it having to look.
+      const detour =
+        wentRound.size > 0 ? ` Went around ${[...wentRound].sort().join(', ')} on the way.` : ''
+      return {
+        ok: true,
+        observation: `Arrived at (${final.x.toFixed(2)}, ${final.z.toFixed(2)}).${detour}`
+      }
     }
 
     const remaining = robot.distanceTo(x, z).toFixed(2)

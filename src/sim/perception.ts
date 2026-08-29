@@ -35,6 +35,12 @@ export interface Sighting {
    * to climb, and no other part of the observation carries it.
    */
   elevation: number
+  /**
+   * Horizontal half-extent, in metres. Seeing a thing tells you how wide it is,
+   * and navigation needs it: a 2.4m boulder has to be given a wider berth than
+   * a 30cm crate.
+   */
+  radius: number
 }
 
 /** Roughly where a sensor would sit — used as the raycast origin. */
@@ -82,7 +88,8 @@ export function perceive(
       position: target,
       distance,
       bearingDeg,
-      elevation: target.y - origin.y
+      elevation: target.y - origin.y,
+      radius: Math.max(object.spec.size[0], object.spec.size[2]) / 2
     })
   }
 

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { Robot } from '../Robot.js'
+import { shortestAngle, steerToward, surroundingsFrom } from '../steering.js'
 import { obstacleAhead, stalls, type Skill, type SkillResult, until } from './types.js'
 
 const schema = z.object({
@@ -40,6 +41,8 @@ export const approach: Skill<z.infer<typeof schema>> = {
     const budget = robot.distanceTo(tx, tz) / 1.4 + 8
 
     const stalled = stalls(2.5)
+    // The thing being approached must not repel the robot away from itself.
+    const around = surroundingsFrom(ctx.world, id)
     let blocked = false
 
     const arrived = await until(ctx, budget, () => {
@@ -49,9 +52,11 @@ export const approach: Skill<z.infer<typeof schema>> = {
         blocked = true
         return true
       }
-      const angle = robot.angleTo(tx, tz)
+
+      const steer = steerToward(robot, tx, tz, around)
+      const angle = shortestAngle(robot.heading, steer.heading)
       robot.setTurn(Math.max(-1, Math.min(1, angle * 2)))
-      robot.setForward(Math.abs(angle) < 0.6 ? 1 : 0.25)
+      robot.setForward(Math.abs(angle) < 0.6 ? steer.forward : 0.25)
       return false
     })
 

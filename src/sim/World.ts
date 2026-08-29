@@ -237,6 +237,7 @@ export class World {
       },
       perception: this.perceptionConfig,
       find: (id) => this.objects.find((o) => o.spec.id === id),
+      groundHeightAt: (x, z) => this.groundHeightAt(x, z),
       capture: () => this.capture(),
       say: (text) => this.speak(text, 'speech'),
       grasp: (object) => this.grasp(object),
