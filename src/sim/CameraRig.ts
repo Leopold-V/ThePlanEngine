@@ -13,6 +13,15 @@ const HANDS_OFF_DELAY = 3.5
 const RECENTER_RATE = 0.7
 const EYE_HEIGHT = 1.5
 const DEFAULT_FOV = 52
+const DEFAULT_NEAR = 0.1
+/**
+ * First person sits inside the robot's own skull — its eye meshes are ~13cm
+ * from the lens. Hiding the body handles that, but only while a visibility flag
+ * is correct, and that flag has been wrong twice. Clipping everything closer
+ * than this makes the robot's own geometry unrenderable rather than merely
+ * hidden. A carried object rides ~0.64m out, so it stays in shot.
+ */
+const POV_NEAR = 0.3
 
 /** Anything the camera can be pointed at. A robot satisfies it; so will the next one. */
 export interface CameraSubject {
@@ -46,7 +55,7 @@ export class CameraRig {
   private readonly desired = new THREE.Vector3()
 
   constructor(canvas: HTMLCanvasElement) {
-    this.camera = new THREE.PerspectiveCamera(DEFAULT_FOV, 1, 0.1, 200)
+    this.camera = new THREE.PerspectiveCamera(DEFAULT_FOV, 1, DEFAULT_NEAR, 200)
     this.camera.position.set(4.5, 3.4, 6)
     this.camera.rotation.order = 'YXZ'
 
@@ -82,6 +91,7 @@ export class CameraRig {
     // somewhere arbitrary; re-seat it behind the subject instead.
     if (leavingPov) this.resetChase = true
     this.camera.fov = mode === 'pov' ? this.povFov : DEFAULT_FOV
+    this.camera.near = mode === 'pov' ? POV_NEAR : DEFAULT_NEAR
     this.camera.updateProjectionMatrix()
   }
 
