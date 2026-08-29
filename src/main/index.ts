@@ -17,7 +17,12 @@ function createWindow(): void {
       preload: join(dirname, '../preload/index.mjs'),
       sandbox: false,
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      // The render loop drives the physics step, so the usual background
+      // throttling would nearly stop the simulation whenever the window is not
+      // in front — leaving a running skill stalled mid-action while the model
+      // waits on it. A simulation has to keep ticking when you look away.
+      backgroundThrottling: false
     }
   })
 

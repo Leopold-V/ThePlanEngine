@@ -3,6 +3,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import RAPIER from '@dimforge/rapier3d-compat'
 import { Robot } from './Robot.js'
 import { WorldModel } from './WorldModel.js'
+import { DebugVisuals } from './debugVisuals.js'
 import { describe } from './observe.js'
 import { DEFAULT_SCENE, WorldObject, type SceneDefinition } from './objects.js'
 import { DEFAULT_PERCEPTION, perceive, type PerceptionConfig, type Sighting } from './perception.js'
@@ -42,6 +43,7 @@ export class World {
   readonly objects: WorldObject[] = []
   readonly model = new WorldModel()
 
+  private readonly debug = new DebugVisuals()
   private perceptionConfig: PerceptionConfig = DEFAULT_PERCEPTION
   private sightings: Sighting[] = []
   private simTime = 0
@@ -98,6 +100,9 @@ export class World {
 
     this.loadScene(DEFAULT_SCENE)
 
+    this.debug.setPerception(this.perceptionConfig)
+    this.scene.add(this.debug.group)
+
     this.resizeObserver = new ResizeObserver(() => this.resize(canvas))
     this.resizeObserver.observe(canvas)
     this.resize(canvas)
@@ -112,8 +117,24 @@ export class World {
   /** Sensor parameters come from the robot profile; pushed in before each run. */
   setPerception(config: PerceptionConfig): void {
     this.perceptionConfig = config
+    this.debug.setPerception(config)
     // Re-sense immediately so the next observation reflects the new sensor.
     this.updatePerception()
+  }
+
+  /** Toggles the field-of-view overlay. Purely a view concern. */
+  setDebugVisuals(on: boolean): void {
+    this.debug.setVisible(on)
+    if (!on) {
+      for (const object of this.objects) {
+        DebugVisuals.setHighlighted(object.mesh.material as THREE.MeshStandardMaterial, false)
+      }
+    }
+  }
+
+  /** Simulation seconds elapsed, for ageing beliefs in the inspector. */
+  get simTimeSeconds(): number {
+    return this.simTime
   }
 
   /** The robot's full sensory report, as the model receives it. */
@@ -164,6 +185,16 @@ export class World {
       this.perceptionConfig
     )
     this.model.update(this.sightings, this.simTime)
+
+    if (this.debug.group.visible) {
+      const visible = new Set(this.sightings.map((s) => s.id))
+      for (const object of this.objects) {
+        DebugVisuals.setHighlighted(
+          object.mesh.material as THREE.MeshStandardMaterial,
+          visible.has(object.spec.id)
+        )
+      }
+    }
   }
 
   private grasp(object: WorldObject): void {
@@ -211,6 +242,7 @@ export class World {
       }
 
       for (const object of this.objects) object.syncMesh()
+      this.debug.update(this.robot.position, this.robot.heading)
 
       this.controls.update()
       this.renderer.render(this.scene, this.camera)
@@ -225,6 +257,7 @@ export class World {
     cancelAnimationFrame(this.frameHandle)
     this.resizeObserver.disconnect()
     this.controls.dispose()
+    this.debug.dispose()
     this.renderer.dispose()
     this.physics.free()
   }

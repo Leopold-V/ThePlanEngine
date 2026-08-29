@@ -6,7 +6,14 @@ import type { SkillResult } from '@sim/skills/types.js'
 import { SkillQueue } from './SkillQueue.js'
 import { fingerprint, resolveProfile } from './resolveProfile.js'
 
-export type EventKind = 'user' | 'assistant' | 'skill' | 'result' | 'error' | 'system'
+export type EventKind =
+  | 'user'
+  | 'assistant'
+  | 'skill'
+  | 'result'
+  | 'observation'
+  | 'error'
+  | 'system'
 
 export interface EngineEvent {
   id: string
@@ -56,10 +63,14 @@ export class PlanEngine {
     try {
       // The observation rides along with the instruction so the model always
       // starts from where the robot actually is.
+      const opening = this.options.world.observationText()
       this.messages.push({
         role: 'user',
-        parts: [{ type: 'text', text: `${instruction}\n\n[${this.options.world.observationText()}]` }]
+        parts: [{ type: 'text', text: `${instruction}\n\n[${opening}]` }]
       })
+      // Surfaced, not just sent: without seeing what the robot perceived you
+      // cannot tell a perception failure from a reasoning failure.
+      this.emit('observation', opening)
 
       const { providerId, profile } = this.options.config()
       const resolved = resolveProfile(profile, SKILLS)
@@ -194,10 +205,12 @@ export class PlanEngine {
    */
   private pushResults(results: ToolResultPart[]): void {
     if (results.length === 0) return
+    const observation = this.options.world.observationText()
     this.messages.push({
       role: 'user',
-      parts: [...results, { type: 'text', text: this.options.world.observationText() }]
+      parts: [...results, { type: 'text', text: observation }]
     })
+    this.emit('observation', observation)
   }
 
   private emit(kind: EventKind, text: string, ok?: boolean): void {

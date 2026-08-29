@@ -101,6 +101,16 @@ it generates the JSON Schema sent to the model *and* validates the arguments tha
 npm run typecheck
 ```
 
+**Driving the simulation without a model.** `planEngineDebug.engine.runSkill('walk_to', {x:3, z:2})`
+and `planEngineDebug.world` are exposed in dev builds. Use them — verifying the sim costs no tokens
+and no subscription usage, and it is how both v0.2 bugs were found.
+
+**The render loop drives physics**, so anything that stops `requestAnimationFrame` stops the
+simulation. Electron sets `backgroundThrottling: false` for this reason. A headless browser tab
+still throttles though: sim time advances ~0.12s per real second when `document.hidden`, so a
+4-second skill takes over half a minute and looks like a hang. To test perception without the loop,
+force a synchronous update with `world.setPerception(world.view().perception)`.
+
 There is no test suite yet (deliberate for v0.1). `PlanEngine` takes `send` by injection, so when
 tests arrive a mock provider can drive the whole loop without a key, network, or GPU — preserve
 that seam.

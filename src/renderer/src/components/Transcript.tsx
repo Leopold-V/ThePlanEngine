@@ -5,7 +5,8 @@ const LABELS: Record<EngineEvent['kind'], string> = {
   user: 'You',
   assistant: 'Model',
   skill: 'Action',
-  result: 'Observation',
+  result: 'Result',
+  observation: 'Senses',
   error: 'Error',
   system: 'Sim'
 }

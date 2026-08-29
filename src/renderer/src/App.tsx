@@ -8,6 +8,7 @@ import { RobotPanel } from './components/RobotPanel.js'
 import { SettingsPanel } from './components/SettingsPanel.js'
 import { Transcript } from './components/Transcript.js'
 import { Viewport } from './components/Viewport.js'
+import { WorldInspector } from './components/WorldInspector.js'
 
 export function App(): React.JSX.Element {
   const [events, setEvents] = useState<EngineEvent[]>([])
@@ -17,6 +18,9 @@ export function App(): React.JSX.Element {
   const [showSettings, setShowSettings] = useState(false)
   const [showRobot, setShowRobot] = useState(false)
   const [input, setInput] = useState('')
+  const [view, setView] = useState<'transcript' | 'world'>('transcript')
+  const [world, setWorld] = useState<World | null>(null)
+  const [showFov, setShowFov] = useState(true)
 
   const engineRef = useRef<PlanEngine | null>(null)
   // The engine reads config at send time, so keep refs the closures can follow.
@@ -31,6 +35,8 @@ export function App(): React.JSX.Element {
   }, [])
 
   const handleWorldReady = useCallback((world: World) => {
+    setWorld(world)
+    world.setDebugVisuals(true)
     engineRef.current = new PlanEngine({
       world,
       send: (req) => bridge.send(req),
@@ -93,7 +99,37 @@ export function App(): React.JSX.Element {
           </div>
         </header>
 
-        <Transcript events={events} />
+        <nav className="tabs panel-tabs">
+          <button
+            className={view === 'transcript' ? 'tab active' : 'tab'}
+            onClick={() => setView('transcript')}
+          >
+            Transcript
+          </button>
+          <button
+            className={view === 'world' ? 'tab active' : 'tab'}
+            onClick={() => setView('world')}
+          >
+            World
+          </button>
+          <label className="fov-toggle">
+            <input
+              type="checkbox"
+              checked={showFov}
+              onChange={(e) => {
+                setShowFov(e.target.checked)
+                world?.setDebugVisuals(e.target.checked)
+              }}
+            />
+            show field of view
+          </label>
+        </nav>
+
+        {view === 'transcript' ? (
+          <Transcript events={events} />
+        ) : (
+          <WorldInspector world={world} />
+        )}
 
         <div className="composer">
           <textarea
