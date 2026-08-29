@@ -227,6 +227,8 @@ v0.1 is the loop. The reason the project exists is what comes after it.
       and the camera and field of view follow it
 - [ ] **v0.8** — talking to it mid-task: interrupt and redirect a run in progress
 - [ ] **v0.9** — recording and replay; deterministic reruns
+- [ ] **later** — detection separated from recognition: wide sensing that reports *something is
+      there*, and a camera that has to be pointed at it to learn *what* it is
 - [ ] **later** — hardware as a configuration: the sensor loadout becomes a profile choice —
       head camera, 360° lidar, mounting and field of view — so what the robot is *built from* is
       a variable rather than a constant

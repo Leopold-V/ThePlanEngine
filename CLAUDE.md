@@ -73,10 +73,17 @@ prompt- or capability-affecting fields to `Settings`.
 seed of a larger idea — that what the robot is *built from* should be a variable, not a constant.
 A head camera with a human-like cone is one loadout; a 360° lidar on the head is another, and a
 real one: Unitree ship the G1 and H1 with exactly that, while Figure and Optimus are deliberately
-camera-only. Picking between them is a design decision worth exposing rather than baking in.
-Extend `perception` into a sensor loadout when this lands — do not add a parallel concept, and do
-not make a wide sensor the default, because a 360° sensor quietly deletes the perception problem
-the app exists to pose.
+camera-only. Extend `perception` into a sensor loadout when this lands rather than adding a
+parallel concept.
+
+**Its prerequisite is splitting detection from recognition**, which `perceive()` currently
+conflates: anything inside the cone comes back fully identified, so today a wider sensor really
+would hand the model every object id in range. That is a defect in the simulation, not a property
+of wide sensors — a lidar returns geometry and cannot tell you a block is red. Done properly,
+wide sensing yields anonymous detections (position, extent, "something is there", enough for
+`steering.ts`) and the head camera yields identity, so `look` becomes structurally necessary
+rather than merely encouraged: you cannot name a thing you have only bumped into. Until that split
+exists, do not widen the default field of view.
 
 ## The two extension points
 
