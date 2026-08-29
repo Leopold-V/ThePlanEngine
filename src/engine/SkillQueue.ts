@@ -54,7 +54,14 @@ export class SkillQueue {
       return { ok: false, observation: `Invalid parameters for ${call.name} — ${issues}` }
     }
 
+    // Preconditions run before the skill starts, so the model gets a reason it
+    // can act on rather than watching an action fail for no stated cause.
+    const world = this.world.view()
+    const refusal = skill.check?.(this.world.robot, parsed.data, world)
+    if (refusal) return { ok: false, observation: refusal }
+
     const ctx: SkillContext = {
+      world,
       signal,
       report,
       nextFrame: async () => {

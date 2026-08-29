@@ -31,8 +31,23 @@ observation ("Arrived at (0.02, -0.11).") ──► back to the model
 ```
 
 The model never touches joint angles. It plans in terms of **skills** — `walk_to`, `turn`,
-`look_at`, `wave`, `say` — and the simulation solves the motion. That keeps the variable under
-test on the planning side, where the interesting differences between models actually are.
+`look_at`, `scan`, `pick_up`, `put_down`, `wave`, `say` — and the simulation solves the motion.
+That keeps the variable under test on the planning side, where the interesting differences
+between models actually are.
+
+### Perception
+
+The robot has a **field of view**, not omniscience. It sees what is in front of it, within range,
+and not hidden behind something else — and it remembers what it has seen. Those beliefs are
+deliberately never corrected while an object is out of view, so the robot can be *wrong* about
+where something is until it looks again. Range, field of view, and occlusion are profile fields,
+so "how much does this model degrade with a narrower field of view" is a measurable experiment.
+
+```
+Robot at (1.98, 1.19) facing 46°. Holding: red_block.
+Visible: table at (5, 1) — 3.0m to the right.
+Remembered: blue_block at (-4, 2), last seen 2s ago; green_block at (-2, -5), last seen 3s ago.
+```
 
 ## Stack
 
@@ -140,7 +155,10 @@ headlessly.
 v0.1 is the loop. The reason the project exists is what comes after it.
 
 - [x] **v0.1** — flat world, one humanoid, 5 skills, pluggable providers, live transcript
-- [ ] **v0.2** — objects, obstacles, and grasping; a richer `Observation`
+- [x] **v0.1.5** — robot profiles: edit the skills, descriptions and context the model sees,
+      with a config fingerprint stamped on every run
+- [x] **v0.2** — objects, field-of-view perception with occlusion, a persistent world model, and
+      grasping
 - [ ] **v0.3** — **scenarios and scoring**: fixed tasks, success criteria, and a leaderboard
       comparing models on the same embodied benchmark
 - [ ] **v0.4** — vision input (render the robot's camera back to multimodal models)

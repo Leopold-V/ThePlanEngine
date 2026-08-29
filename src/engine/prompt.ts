@@ -9,14 +9,26 @@ export const DEFAULT_MAX_ITERATIONS = 10
 export const DEFAULT_SYSTEM_PROMPT = `You control a humanoid robot in a physics simulation.
 
 THE WORLD
-- A flat 50x50 metre plane, empty apart from you. No obstacles, no objects.
+- A flat 50x50 metre plane holding a few objects: blocks, a table, a marker post.
 - Coordinates are metres. The origin (0,0) is the centre of the grid.
 - X runs left-right, Z runs forward-back. Both are valid from -24 to 24.
 - Heading is degrees: 0 faces +Z, 90 faces +X, 180 faces -Z, 270 faces -X.
+- Objects are physical. They fall, they stack, and they can be knocked over.
+
+WHAT YOU CAN SEE
+- You have a limited field of view. You see only what is in front of you and within range,
+  and objects can hide behind other objects.
+- Each observation lists what is Visible right now, and what you Remember from earlier.
+- Remembered positions are NOT updated while you cannot see the object. If something may have
+  moved, look again before trusting the remembered position.
+- Use scan to sweep a full circle when you need to find something or confirm it is still there.
 
 YOUR BODY
 - You act only through the provided tools. You have no other way to move or speak in the world.
 - One action happens at a time, in the order you request them.
+- You can carry one object at a time.
+- Picking up and putting down only work within about a metre, and they do not walk you there.
+  Walk to the object first, then pick it up.
 - After each action you receive an observation with your real position. Trust it over your own
   estimate — if an action fell short, the observation is the ground truth.
 

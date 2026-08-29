@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { type Skill, type SkillResult, until } from './types.js'
 
-const ARRIVAL_RADIUS = 0.35
+const ARRIVAL_RADIUS = 0.25
 /** Walk at reduced speed until roughly facing the target, so turns look natural. */
 const ALIGNED = 0.6
 
@@ -15,7 +15,8 @@ export const walkTo: Skill<z.infer<typeof schema>> = {
   category: 'locomotion',
   description:
     'Walk the robot to a point on the ground. The world is a flat 50x50m grid centred on (0,0); ' +
-    'X runs east-west, Z runs north-south. Arrives within 0.35m of the target.',
+    'X runs east-west, Z runs north-south. Arrives within 0.25m of the target, so to reach an ' +
+    'object aim for a spot beside it rather than at it.',
   schema,
 
   async run(robot, { x, z }, ctx): Promise<SkillResult> {

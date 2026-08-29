@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import type RAPIER from '@dimforge/rapier3d-compat'
+import type { WorldObject } from './objects.js'
 
 const CAPSULE_HALF_HEIGHT = 0.55
 const CAPSULE_RADIUS = 0.25
@@ -21,8 +22,9 @@ export class Robot {
   readonly mesh: THREE.Group
 
   private readonly body: RAPIER.RigidBody
-  private readonly collider: RAPIER.Collider
+  private readonly collider_: RAPIER.Collider
   private readonly controller: RAPIER.KinematicCharacterController
+  private heldObject: WorldObject | null = null
   private readonly rapier: typeof RAPIER
 
   private readonly leftArm: THREE.Group
@@ -50,7 +52,7 @@ export class Robot {
     this.body = world.createRigidBody(
       rapier.RigidBodyDesc.kinematicPositionBased().setTranslation(0, CENTER_HEIGHT, 0)
     )
-    this.collider = world.createCollider(
+    this.collider_ = world.createCollider(
       rapier.ColliderDesc.capsule(CAPSULE_HALF_HEIGHT, CAPSULE_RADIUS),
       this.body
     )
@@ -59,6 +61,38 @@ export class Robot {
     this.controller.enableAutostep(0.3, 0.2, true)
     this.controller.enableSnapToGround(0.3)
     this.controller.setApplyImpulsesToDynamicBodies(true)
+  }
+
+  /** Exposed so perception can exclude the robot from its own line-of-sight rays. */
+  get collider(): RAPIER.Collider {
+    return this.collider_
+  }
+
+  /** The object currently carried, if any. */
+  get held(): WorldObject | null {
+    return this.heldObject
+  }
+
+  /**
+   * Reach for picking up and putting down, in metres. Comfortably larger than
+   * `walk_to`'s arrival tolerance: the model aims for a spot near an object and
+   * lands up to a quarter-metre off, so a tight reach would fail constantly for
+   * reasons that say nothing about its planning.
+   */
+  static readonly REACH = 1.5
+
+  /** Where a carried object rides: in front of the chest, at carry height. */
+  carryAnchor(): THREE.Vector3 {
+    const p = this.position
+    return new THREE.Vector3(
+      p.x + Math.sin(this.heading) * 0.45,
+      p.y + 1.05,
+      p.z + Math.cos(this.heading) * 0.45
+    )
+  }
+
+  hold(object: WorldObject | null): void {
+    this.heldObject = object
   }
 
   // --- state read by skills and by observe() ---------------------------------
@@ -128,7 +162,7 @@ export class Robot {
       z: Math.cos(this.heading) * speed * dt
     }
 
-    this.controller.computeColliderMovement(this.collider, desired)
+    this.controller.computeColliderMovement(this.collider_, desired)
     const moved = this.controller.computedMovement()
 
     if (this.controller.computedGrounded()) this.verticalVelocity = 0
@@ -139,6 +173,13 @@ export class Robot {
       y: t.y + moved.y,
       z: t.z + moved.z
     })
+
+    // A carried object rides the anchor; its body is kinematic while held, so
+    // it still pushes the world around but cannot be knocked loose.
+    if (this.heldObject) {
+      const anchor = this.carryAnchor()
+      this.heldObject.moveTo(anchor.x, anchor.y, anchor.z)
+    }
 
     this.syncMesh(dt, Math.abs(speed))
   }

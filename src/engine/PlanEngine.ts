@@ -1,7 +1,6 @@
 import type { RobotProfile } from '@shared/profile.js'
 import type { Message, ModelReply, Part, SendRequest, ToolResultPart } from '@shared/types.js'
 import type { World } from '@sim/World.js'
-import { describe } from '@sim/observe.js'
 import { SKILLS } from '@sim/skills/registry.js'
 import type { SkillResult } from '@sim/skills/types.js'
 import { SkillQueue } from './SkillQueue.js'
@@ -59,12 +58,16 @@ export class PlanEngine {
       // starts from where the robot actually is.
       this.messages.push({
         role: 'user',
-        parts: [{ type: 'text', text: `${instruction}\n\n[${describe(this.options.world.robot)}]` }]
+        parts: [{ type: 'text', text: `${instruction}\n\n[${this.options.world.observationText()}]` }]
       })
 
       const { providerId, profile } = this.options.config()
       const resolved = resolveProfile(profile, SKILLS)
       const { maxIterations, tools, enabled } = resolved
+
+      // Sensor parameters are part of the experiment, so they come from the
+      // profile rather than being fixed in the simulation.
+      this.options.world.setPerception(resolved.perception)
 
       // Provenance: names exactly what the model was shown for this run.
       this.emit(
@@ -193,7 +196,7 @@ export class PlanEngine {
     if (results.length === 0) return
     this.messages.push({
       role: 'user',
-      parts: [...results, { type: 'text', text: describe(this.options.world.robot) }]
+      parts: [...results, { type: 'text', text: this.options.world.observationText() }]
     })
   }
 

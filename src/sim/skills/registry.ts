@@ -1,6 +1,9 @@
 import { z } from 'zod'
 import { lookAt } from './lookAt.js'
+import { pickUp } from './pickUp.js'
+import { putDown } from './putDown.js'
 import { say } from './say.js'
+import { scan } from './scan.js'
 import { turn } from './turn.js'
 import type { Skill } from './types.js'
 import { walkTo } from './walkTo.js'
@@ -15,7 +18,7 @@ import { wave } from './wave.js'
  * which is where type safety is actually enforced.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const SKILLS: Skill<any>[] = [walkTo, turn, lookAt, wave, say]
+export const SKILLS: Skill<any>[] = [walkTo, turn, lookAt, scan, pickUp, putDown, wave, say]
 
 /**
  * The JSON Schema the model is shown for a skill, generated from its zod

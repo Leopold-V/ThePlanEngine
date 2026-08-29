@@ -13,6 +13,20 @@ export interface SkillOverride {
   description?: string
 }
 
+/**
+ * Sensor parameters. Declared here rather than imported from `sim/` because
+ * `shared/` stays free of simulation code; `resolveProfile` merges these over
+ * the defaults in `sim/perception.ts`. All optional — absent means the default.
+ */
+export interface PerceptionSettings {
+  /** How far the robot can see, in metres. */
+  range?: number
+  /** Half the field of view, in degrees either side of the heading. */
+  halfAngleDeg?: number
+  /** Whether objects can hide behind other objects. */
+  occlusion?: boolean
+}
+
 export interface RobotProfile {
   id: string
   name: string
@@ -31,6 +45,7 @@ export interface RobotProfile {
    */
   skills: Record<string, SkillOverride>
   maxIterations?: number
+  perception?: PerceptionSettings
 }
 
 export const DEFAULT_PROFILE: RobotProfile = {

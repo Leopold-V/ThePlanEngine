@@ -152,6 +152,65 @@ export function RobotPanel({ profile, onChange, onReset, onClose }: Props): Reac
               </small>
             </label>
 
+            <h3>Perception</h3>
+            <p className="muted small">
+              The robot only sees what is in front of it. Narrowing this is a real experiment —
+              it changes the config fingerprint, so runs stay comparable.
+            </p>
+
+            <div className="field-row">
+              <label className="narrow">
+                Sight range (m)
+                <input
+                  type="number"
+                  min={1}
+                  max={25}
+                  step={0.5}
+                  value={resolved.perception.range}
+                  onChange={(e) =>
+                    onChange({
+                      ...profile,
+                      perception: { ...profile.perception, range: Number(e.target.value) || 1 }
+                    })
+                  }
+                />
+              </label>
+
+              <label className="narrow">
+                Half field of view (°)
+                <input
+                  type="number"
+                  min={5}
+                  max={180}
+                  value={resolved.perception.halfAngleDeg}
+                  onChange={(e) =>
+                    onChange({
+                      ...profile,
+                      perception: {
+                        ...profile.perception,
+                        halfAngleDeg: Number(e.target.value) || 5
+                      }
+                    })
+                  }
+                />
+                <small>180 sees all around.</small>
+              </label>
+            </div>
+
+            <label className="checkbox">
+              <input
+                type="checkbox"
+                checked={resolved.perception.occlusion}
+                onChange={(e) =>
+                  onChange({
+                    ...profile,
+                    perception: { ...profile.perception, occlusion: e.target.checked }
+                  })
+                }
+              />
+              Objects can hide behind other objects
+            </label>
+
             <label className="narrow">
               Max steps per instruction
               <input

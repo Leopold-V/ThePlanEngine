@@ -1,5 +1,6 @@
 import type { z } from 'zod'
 import type { Robot } from '../Robot.js'
+import type { WorldView } from '../WorldView.js'
 
 export class AbortedError extends Error {
   constructor() {
@@ -9,6 +10,8 @@ export class AbortedError extends Error {
 }
 
 export interface SkillContext {
+  /** Everything beyond the robot's own body. */
+  world: WorldView
   /** Fires when the user presses Stop. */
   signal: AbortSignal
   /** Resolves on the next physics step with its delta. Rejects if aborted. */
@@ -39,10 +42,8 @@ export type SkillCategory =
  * One robot capability. Adding a file here and registering it is the entire
  * process for giving the model a new thing to do — the engine is untouched.
  *
- * Room to grow without a breaking change: this should later accept optional
- * `preconditions` and `effects`, so that once objects exist the engine can tell
- * the model "you cannot grasp what you are not near" rather than letting the
- * call fail blindly.
+ * Still room to grow without a breaking change: `effects` (postconditions)
+ * would let a plan be validated before any of it runs.
  */
 export interface Skill<P> {
   name: string
@@ -53,6 +54,12 @@ export interface Skill<P> {
    */
   description: string
   schema: z.ZodType<P>
+  /**
+   * Preconditions. Return a reason to refuse the call before `run` is entered,
+   * or null to proceed. The reason goes straight back to the model, so write it
+   * as an explanation it can act on — "3.2m away, reach is 1.2m", not "invalid".
+   */
+  check?(robot: Robot, params: P, world: WorldView): string | null
   run(robot: Robot, params: P, ctx: SkillContext): Promise<SkillResult>
 }
 

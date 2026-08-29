@@ -1,5 +1,6 @@
 import type { RobotProfile } from '@shared/profile.js'
 import type { ToolSchema } from '@shared/types.js'
+import { DEFAULT_PERCEPTION, type PerceptionConfig } from '@sim/perception.js'
 import { jsonSchemaOf } from '@sim/skills/registry.js'
 import type { Skill, SkillCategory } from '@sim/skills/types.js'
 import { DEFAULT_MAX_ITERATIONS, DEFAULT_SYSTEM_PROMPT } from './prompt.js'
@@ -19,6 +20,7 @@ export interface ResolvedSkill {
 export interface ResolvedConfig {
   systemPrompt: string
   maxIterations: number
+  perception: PerceptionConfig
   /** Every skill, disabled ones included — the panel needs the full list. */
   skills: ResolvedSkill[]
   /** Enabled skills only, in the shape providers hand to the model. */
@@ -61,6 +63,11 @@ export function resolveProfile(
   return {
     systemPrompt: profile.systemPrompt?.trim() || DEFAULT_SYSTEM_PROMPT,
     maxIterations: profile.maxIterations ?? DEFAULT_MAX_ITERATIONS,
+    perception: {
+      range: profile.perception?.range ?? DEFAULT_PERCEPTION.range,
+      halfAngleDeg: profile.perception?.halfAngleDeg ?? DEFAULT_PERCEPTION.halfAngleDeg,
+      occlusion: profile.perception?.occlusion ?? DEFAULT_PERCEPTION.occlusion
+    },
     skills: resolved,
     tools: enabled.map((s) => ({
       name: s.name,
@@ -84,6 +91,7 @@ export function fingerprint(config: ResolvedConfig): string {
   const canonical = stringifyCanonical({
     systemPrompt: config.systemPrompt,
     maxIterations: config.maxIterations,
+    perception: config.perception,
     tools: config.tools
   })
 

@@ -2,11 +2,18 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import RAPIER from '@dimforge/rapier3d-compat'
 import { Robot } from './Robot.js'
+import { WorldModel } from './WorldModel.js'
+import { describe } from './observe.js'
+import { DEFAULT_SCENE, WorldObject, type SceneDefinition } from './objects.js'
+import { DEFAULT_PERCEPTION, perceive, type PerceptionConfig, type Sighting } from './perception.js'
+import type { WorldView } from './WorldView.js'
 
 const GROUND_HALF_EXTENT = 25
 const FIXED_STEP = 1 / 60
 /** Never simulate more than this per frame, so a stalled tab can't spiral. */
 const MAX_FRAME_DELTA = 0.1
+/** Perception runs at 10Hz — raycasting every object at 60Hz is wasted work. */
+const PERCEPTION_INTERVAL = 0.1
 
 export type Ticker = (dt: number) => void
 
@@ -32,6 +39,13 @@ export class World {
   readonly scene: THREE.Scene
   readonly camera: THREE.PerspectiveCamera
   readonly robot: Robot
+  readonly objects: WorldObject[] = []
+  readonly model = new WorldModel()
+
+  private perceptionConfig: PerceptionConfig = DEFAULT_PERCEPTION
+  private sightings: Sighting[] = []
+  private simTime = 0
+  private sincePerception = 0
 
   private readonly renderer: THREE.WebGLRenderer
   private readonly controls: OrbitControls
@@ -82,6 +96,8 @@ export class World {
     this.robot = new Robot(RAPIER, this.physics)
     this.scene.add(this.robot.mesh)
 
+    this.loadScene(DEFAULT_SCENE)
+
     this.resizeObserver = new ResizeObserver(() => this.resize(canvas))
     this.resizeObserver.observe(canvas)
     this.resize(canvas)
@@ -91,6 +107,83 @@ export class World {
   addTicker(fn: Ticker): () => void {
     this.tickers.add(fn)
     return () => this.tickers.delete(fn)
+  }
+
+  /** Sensor parameters come from the robot profile; pushed in before each run. */
+  setPerception(config: PerceptionConfig): void {
+    this.perceptionConfig = config
+    // Re-sense immediately so the next observation reflects the new sensor.
+    this.updatePerception()
+  }
+
+  /** The robot's full sensory report, as the model receives it. */
+  observationText(): string {
+    return describe(this.robot, this.model, this.sightings, this.simTime)
+  }
+
+  /**
+   * The narrow surface skills act through.
+   *
+   * `sightings` and `now` are getters, not values: a skill holds this object for
+   * its whole run, so a snapshot would go stale the moment the robot moved —
+   * which silently made `scan` report only what was visible when it started.
+   */
+  view(): WorldView {
+    const world = this
+    return {
+      robot: this.robot,
+      objects: this.objects,
+      model: this.model,
+      get sightings() {
+        return world.sightings
+      },
+      get now() {
+        return world.simTime
+      },
+      perception: this.perceptionConfig,
+      find: (id) => this.objects.find((o) => o.spec.id === id),
+      grasp: (object) => this.grasp(object),
+      release: (x, z) => this.release(x, z)
+    }
+  }
+
+  private loadScene(scene: SceneDefinition): void {
+    for (const spec of scene.objects) {
+      const object = new WorldObject(spec, RAPIER, this.physics)
+      this.objects.push(object)
+      this.scene.add(object.mesh)
+    }
+  }
+
+  private updatePerception(): void {
+    this.sightings = perceive(
+      this.robot,
+      this.objects,
+      this.physics,
+      RAPIER,
+      this.perceptionConfig
+    )
+    this.model.update(this.sightings, this.simTime)
+  }
+
+  private grasp(object: WorldObject): void {
+    object.setCarried(RAPIER, true)
+    this.robot.hold(object)
+    // In hand, not in the world: drop it from the map so it isn't also
+    // reported as a remembered object lying on the floor.
+    this.model.forget(object.spec.id)
+  }
+
+  private release(x: number, z: number): WorldObject | null {
+    const object = this.robot.held
+    if (!object) return null
+
+    this.robot.hold(null)
+    object.setCarried(RAPIER, false)
+    // Released at carry height so it falls the last short distance and settles
+    // on whatever is beneath — which is what makes stacking work.
+    object.moveTo(x, this.robot.position.y + 1.05, z)
+    return object
   }
 
   start(): void {
@@ -105,10 +198,19 @@ export class World {
 
       while (this.accumulator >= FIXED_STEP) {
         this.accumulator -= FIXED_STEP
+        this.simTime += FIXED_STEP
         for (const tick of this.tickers) tick(FIXED_STEP)
         this.robot.update(FIXED_STEP)
         this.physics.step()
+
+        this.sincePerception += FIXED_STEP
+        if (this.sincePerception >= PERCEPTION_INTERVAL) {
+          this.sincePerception = 0
+          this.updatePerception()
+        }
       }
+
+      for (const object of this.objects) object.syncMesh()
 
       this.controls.update()
       this.renderer.render(this.scene, this.camera)

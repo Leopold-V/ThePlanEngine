@@ -497,6 +497,25 @@ button.ghost {
   margin-bottom: 0.5rem;
 }
 
+.field-row {
+  display: flex;
+  gap: 1rem;
+}
+
+.robot-body label.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text);
+  font-size: 0.8rem;
+}
+
+.robot-body label.checkbox input {
+  width: auto;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
 button.link {
   background: none;
   border: none;
