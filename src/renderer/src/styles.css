@@ -282,3 +282,227 @@ button.ghost {
   gap: 0.5rem;
   margin-top: 1.5rem;
 }
+
+/* --- robot panel --------------------------------------------------------- */
+
+.robot-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  width: min(1100px, 100%);
+  height: min(760px, 92vh);
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  overflow: hidden;
+}
+
+.robot-panel > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.robot-panel h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.robot-panel code {
+  font-family: ui-monospace, 'Cascadia Code', monospace;
+  color: var(--accent);
+}
+
+.muted {
+  color: var(--muted);
+  margin: 0.25rem 0 0;
+  font-size: 0.78rem;
+}
+
+.muted.small {
+  font-size: 0.72rem;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.6rem 1.25rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 0.45rem 0.75rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.tab.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+.robot-body {
+  overflow-y: auto;
+  padding: 1.25rem;
+  min-height: 0;
+}
+
+.robot-body.two-col {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 1.25rem;
+  padding: 0;
+}
+
+.skill-list {
+  overflow-y: auto;
+  border-right: 1px solid var(--border);
+  padding: 1rem 0.75rem;
+}
+
+.skill-list section {
+  margin-bottom: 1rem;
+}
+
+.skill-list h3 {
+  margin: 0 0 0.4rem 0.5rem;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.skill-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.82rem;
+  font-family: ui-monospace, 'Cascadia Code', monospace;
+}
+
+.skill-row.selected {
+  background: var(--panel-2);
+  border-color: var(--border);
+}
+
+.skill-row.disabled .skill-name {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.skill-row input[type='checkbox'] {
+  width: auto;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.skill-name {
+  flex: 1;
+}
+
+.badge {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+  background: rgba(76, 125, 255, 0.18);
+  color: var(--accent);
+}
+
+.badge.off {
+  background: rgba(255, 95, 109, 0.15);
+  color: var(--danger);
+  margin-left: 0.5rem;
+}
+
+.skill-detail {
+  overflow-y: auto;
+  padding: 1.25rem 1.25rem 1.25rem 0;
+}
+
+.skill-detail h3 {
+  margin: 0 0 1rem;
+  font-size: 0.95rem;
+  font-family: ui-monospace, 'Cascadia Code', monospace;
+}
+
+.skill-detail h4 {
+  margin: 1.5rem 0 0.4rem;
+  font-size: 0.8rem;
+}
+
+.robot-body label {
+  display: block;
+  margin-bottom: 1.25rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.robot-body label.narrow {
+  max-width: 220px;
+}
+
+.robot-body textarea,
+.robot-body input {
+  margin-top: 0.35rem;
+  color: var(--text);
+  font-family: ui-monospace, 'Cascadia Code', monospace;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.robot-body small {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.robot-body h3 {
+  font-size: 0.8rem;
+  margin: 1.25rem 0 0.4rem;
+}
+
+.robot-body pre,
+.skill-detail pre {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.75rem;
+  font-size: 0.74rem;
+  line-height: 1.55;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0 0 0.75rem;
+}
+
+.skill-detail details summary {
+  cursor: pointer;
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-bottom: 0.5rem;
+}
+
+button.link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  font-size: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}

@@ -7,6 +7,7 @@ const schema = z.object({
 
 export const say: Skill<z.infer<typeof schema>> = {
   name: 'say',
+  category: 'communication',
   description:
     'Make the robot speak a line out loud in the world. Use this for in-character speech; ' +
     'plain replies to the operator do not need a tool call.',

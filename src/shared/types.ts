@@ -98,11 +98,13 @@ export interface ProviderSettings {
   allowAmbientAuth?: boolean
 }
 
+/**
+ * How to reach a model. Everything about *what the model is asked* lives in the
+ * robot profile instead — see `shared/profile.ts`.
+ */
 export interface Settings {
   activeProviderId: string
   providers: ProviderSettings[]
-  /** Hard cap on model→tool→model round trips per user instruction. */
-  maxIterations: number
 }
 
 export interface ProviderStatus {

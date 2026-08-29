@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import type { ToolSchema } from '@shared/types.js'
 import { lookAt } from './lookAt.js'
 import { say } from './say.js'
 import { turn } from './turn.js'
@@ -18,13 +17,16 @@ import { wave } from './wave.js'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const SKILLS: Skill<any>[] = [walkTo, turn, lookAt, wave, say]
 
-/** JSON Schema for each skill, in the shape providers hand to the model. */
-export function toolSchemas(): ToolSchema[] {
-  return SKILLS.map((skill) => {
-    const json = z.toJSONSchema(skill.schema, { io: 'input' }) as Record<string, unknown>
-    delete json['$schema']
-    return { name: skill.name, description: skill.description, parameters: json }
-  })
+/**
+ * The JSON Schema the model is shown for a skill, generated from its zod
+ * schema — which stays the single source of truth for both the schema sent out
+ * and the validation of arguments coming back. Not overridable by a profile.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function jsonSchemaOf(skill: Skill<any>): Record<string, unknown> {
+  const json = z.toJSONSchema(skill.schema, { io: 'input' }) as Record<string, unknown>
+  delete json['$schema']
+  return json
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

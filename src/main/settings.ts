@@ -11,7 +11,6 @@ interface StoredProvider extends Omit<ProviderSettings, 'apiKey'> {
 
 interface StoredSettings {
   activeProviderId: string
-  maxIterations: number
   providers: StoredProvider[]
 }
 
@@ -47,11 +46,7 @@ function merge(stored: StoredSettings | null): StoredSettings {
     return rest
   })
   if (!stored) {
-    return {
-      activeProviderId: DEFAULT_SETTINGS.activeProviderId,
-      maxIterations: DEFAULT_SETTINGS.maxIterations,
-      providers: presets
-    }
+    return { activeProviderId: DEFAULT_SETTINGS.activeProviderId, providers: presets }
   }
   const byId = new Map(stored.providers.map((p) => [p.id, p]))
   const providers = presets.map((preset) => ({ ...preset, ...(byId.get(preset.id) ?? {}) }))
@@ -84,7 +79,6 @@ export function getSettings(): Settings {
   const stored = read()
   return {
     activeProviderId: stored.activeProviderId,
-    maxIterations: stored.maxIterations,
     providers: stored.providers.map(({ encryptedKey, ...p }) => ({
       ...p,
       apiKey: encryptedKey ? STORED_KEY : ''
@@ -98,7 +92,6 @@ export function saveSettings(incoming: Settings): Settings {
 
   write({
     activeProviderId: incoming.activeProviderId,
-    maxIterations: incoming.maxIterations,
     providers: incoming.providers.map(({ apiKey, ...p }) => ({
       ...p,
       encryptedKey: apiKey === STORED_KEY ? previous.get(p.id) : encrypt(apiKey ?? '')

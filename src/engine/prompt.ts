@@ -1,4 +1,12 @@
-export const SYSTEM_PROMPT = `You control a humanoid robot in a physics simulation.
+/** Hard cap on model→tool→model round trips per instruction. */
+export const DEFAULT_MAX_ITERATIONS = 10
+
+/**
+ * The robot's context. A profile may replace this wholesale; see
+ * `shared/profile.ts`. Editing it is a first-class experiment, which is why it
+ * lives behind the profile rather than being hardcoded into the engine.
+ */
+export const DEFAULT_SYSTEM_PROMPT = `You control a humanoid robot in a physics simulation.
 
 THE WORLD
 - A flat 50x50 metre plane, empty apart from you. No obstacles, no objects.

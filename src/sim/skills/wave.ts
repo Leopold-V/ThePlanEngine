@@ -12,6 +12,7 @@ const schema = z.object({
 
 export const wave: Skill<z.infer<typeof schema>> = {
   name: 'wave',
+  category: 'gesture',
   description: 'Raise the right arm and wave. A greeting gesture; does not move the robot.',
   schema,
 

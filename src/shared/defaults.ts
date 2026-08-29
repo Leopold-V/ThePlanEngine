@@ -13,7 +13,6 @@ export const STORED_KEY = '__stored__'
  */
 export const DEFAULT_SETTINGS: Settings = {
   activeProviderId: 'claude-code',
-  maxIterations: 10,
   providers: [
     {
       // Default because it needs no setup: it runs on an existing Claude Code

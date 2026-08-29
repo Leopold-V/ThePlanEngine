@@ -1,10 +1,11 @@
+import type { RobotProfile } from '@shared/profile.js'
 import type { Message, ModelReply, Part, SendRequest, ToolResultPart } from '@shared/types.js'
 import type { World } from '@sim/World.js'
 import { describe } from '@sim/observe.js'
-import { toolSchemas } from '@sim/skills/registry.js'
+import { SKILLS } from '@sim/skills/registry.js'
 import type { SkillResult } from '@sim/skills/types.js'
 import { SkillQueue } from './SkillQueue.js'
-import { SYSTEM_PROMPT } from './prompt.js'
+import { fingerprint, resolveProfile } from './resolveProfile.js'
 
 export type EventKind = 'user' | 'assistant' | 'skill' | 'result' | 'error' | 'system'
 
@@ -19,7 +20,8 @@ export interface EngineEvent {
 export interface PlanEngineOptions {
   world: World
   send: (req: SendRequest) => Promise<ModelReply>
-  config: () => { providerId: string; maxIterations: number }
+  /** Read at run time, so robot-panel edits take effect on the next run. */
+  config: () => { providerId: string; profile: RobotProfile }
   onEvent: (event: EngineEvent) => void
   onRunningChange: (running: boolean) => void
 }
@@ -60,8 +62,15 @@ export class PlanEngine {
         parts: [{ type: 'text', text: `${instruction}\n\n[${describe(this.options.world.robot)}]` }]
       })
 
-      const { providerId, maxIterations } = this.options.config()
-      const tools = toolSchemas()
+      const { providerId, profile } = this.options.config()
+      const resolved = resolveProfile(profile, SKILLS)
+      const { maxIterations, tools, enabled } = resolved
+
+      // Provenance: names exactly what the model was shown for this run.
+      this.emit(
+        'system',
+        `config ${fingerprint(resolved)} · ${tools.length} skill${tools.length === 1 ? '' : 's'}`
+      )
 
       for (let iteration = 0; iteration < maxIterations; iteration++) {
         if (controller.signal.aborted) {
@@ -71,7 +80,7 @@ export class PlanEngine {
 
         const reply = await this.options.send({
           providerId,
-          system: SYSTEM_PROMPT,
+          system: resolved.systemPrompt,
           messages: this.messages,
           tools
         })
@@ -99,11 +108,11 @@ export class PlanEngine {
         for (const call of reply.toolCalls) {
           if (controller.signal.aborted) break
           this.emit('skill', formatCall(call.name, call.args))
-          const result = await this.queue.execute(
-            call,
-            (text) => this.emit('system', text),
-            controller.signal
-          )
+          const result = await this.queue.execute(call, {
+            report: (text) => this.emit('system', text),
+            signal: controller.signal,
+            allowed: enabled
+          })
           this.emit('result', result.observation, result.ok)
           results.push({
             type: 'tool_result',
@@ -152,10 +161,14 @@ export class PlanEngine {
     this.options.onRunningChange(true)
     this.emit('skill', formatCall(name, args))
     try {
+      const { profile } = this.options.config()
       const result = await this.queue.execute(
         { id: crypto.randomUUID(), name, args },
-        (text) => this.emit('system', text),
-        controller.signal
+        {
+          report: (text) => this.emit('system', text),
+          signal: controller.signal,
+          allowed: resolveProfile(profile, SKILLS).enabled
+        }
       )
       this.emit('result', result.observation, result.ok)
       return result

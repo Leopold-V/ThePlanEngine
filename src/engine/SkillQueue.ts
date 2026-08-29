@@ -1,7 +1,19 @@
 import type { ToolCall } from '@shared/types.js'
 import type { World } from '@sim/World.js'
-import { findSkill, skillNames } from '@sim/skills/registry.js'
+import { findSkill } from '@sim/skills/registry.js'
 import { AbortedError, type SkillContext, type SkillResult } from '@sim/skills/types.js'
+
+export interface ExecuteOptions {
+  /** Progress line for the event log. Not sent to the model. */
+  report: (text: string) => void
+  signal: AbortSignal
+  /**
+   * Skills the active profile exposes. A skill disabled in the profile is
+   * refused here too — the model should never have seen it, but the simulation
+   * must not depend on the model behaving.
+   */
+  allowed: ReadonlySet<string>
+}
 
 /**
  * Bridges the world's fixed-step loop to async skills: a skill awaits
@@ -24,16 +36,13 @@ export class SkillQueue {
    * Validates and runs one tool call. Never throws — every failure comes back
    * as a result the model can read and replan around.
    */
-  async execute(
-    call: ToolCall,
-    report: (text: string) => void,
-    signal: AbortSignal
-  ): Promise<SkillResult> {
-    const skill = findSkill(call.name)
+  async execute(call: ToolCall, { report, signal, allowed }: ExecuteOptions): Promise<SkillResult> {
+    const skill = allowed.has(call.name) ? findSkill(call.name) : undefined
     if (!skill) {
       return {
         ok: false,
-        observation: `No such skill "${call.name}". Available skills: ${skillNames().join(', ')}.`
+        observation:
+          `No such skill "${call.name}". Available skills: ` + `${[...allowed].join(', ')}.`
       }
     }
 

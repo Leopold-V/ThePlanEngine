@@ -91,20 +91,6 @@ export function SettingsPanel({ settings, onSave, onClose }: Props): React.JSX.E
           </>
         )}
 
-        <label>
-          Max steps per instruction
-          <input
-            type="number"
-            min={1}
-            max={50}
-            value={draft.maxIterations}
-            onChange={(e) =>
-              setDraft({ ...draft, maxIterations: Number(e.target.value) || 1 })
-            }
-          />
-          <small>Caps how many model→action round trips one instruction can take.</small>
-        </label>
-
         <div className="modal-actions">
           <button className="ghost" onClick={onClose}>
             Cancel

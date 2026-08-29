@@ -24,12 +24,33 @@ export interface SkillResult {
 }
 
 /**
+ * Groups skills in the robot panel. `manipulation` and `perception` are
+ * declared ahead of the v0.2 objects-and-grasping work so the grouping stays
+ * stable when those skills land.
+ */
+export type SkillCategory =
+  | 'locomotion'
+  | 'manipulation'
+  | 'perception'
+  | 'gesture'
+  | 'communication'
+
+/**
  * One robot capability. Adding a file here and registering it is the entire
  * process for giving the model a new thing to do — the engine is untouched.
+ *
+ * Room to grow without a breaking change: this should later accept optional
+ * `preconditions` and `effects`, so that once objects exist the engine can tell
+ * the model "you cannot grasp what you are not near" rather than letting the
+ * call fail blindly.
  */
 export interface Skill<P> {
   name: string
-  /** The model reads this to decide when to call the skill. It is prompt text. */
+  category: SkillCategory
+  /**
+   * The model reads this to decide when to call the skill — it is prompt text,
+   * not a code comment. A profile may override it; see `shared/profile.ts`.
+   */
   description: string
   schema: z.ZodType<P>
   run(robot: Robot, params: P, ctx: SkillContext): Promise<SkillResult>

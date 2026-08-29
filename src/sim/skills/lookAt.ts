@@ -8,6 +8,7 @@ const schema = z.object({
 
 export const lookAt: Skill<z.infer<typeof schema>> = {
   name: 'look_at',
+  category: 'locomotion',
   description: 'Turn the robot to face a point on the ground without walking towards it.',
   schema,
 

@@ -43,6 +43,26 @@ On Windows only the npm shims are on PATH; the executable is at
 `shell: false` — Node refuses to spawn the `.cmd` without a shell (EINVAL), and enabling the shell
 would put a multi-line system prompt through cmd.exe parsing.
 
+## Robot profiles — the configuration contract
+
+`shared/profile.ts` defines the robot's capability definition as a serializable document, not app
+settings. See [the spec](docs/specs/2026-08-29-robot-profile-design.md). Two rules keep it honest:
+
+- **Stored sparse, resolved at run time.** A profile stores only the fields actually changed;
+  `engine/resolveProfile.ts` merges it with the code registry to produce the literal system prompt
+  and tool schemas the model receives. An absent key means "code default, enabled", so `skills: {}`
+  is exactly the code defaults. Never write a full snapshot back into the profile — that breaks the
+  property that improving a description in code reaches every profile.
+- **The code registry decides which skills exist**, not the profile. Orphan keys resolve away; a
+  new skill appears immediately, enabled.
+
+Every run emits its `fingerprint(resolved)` into the transcript. That is the provenance record
+v0.3 scoring will hang off, so anything that changes what the model sees must go through
+`resolveProfile` — otherwise the fingerprint lies.
+
+Settings hold *how to reach a model*; the profile holds *what the model is asked*. Do not add
+prompt- or capability-affecting fields to `Settings`.
+
 ## The two extension points
 
 Adding either should touch exactly two files. If a change requires editing `PlanEngine`, that is a
