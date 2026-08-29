@@ -71,6 +71,8 @@ const CRATE_COLORS = [0xb5763f, 0xa8683a, 0xc08a4d]
  * as a hole rather than as a boulder, especially in the robot's own camera.
  */
 const BOULDER_COLORS = [0x7a8090, 0x8b8f9c, 0x6d7382]
+/** Warmer and lighter than rock, so built things read as built. */
+const STONE_COLORS = [0x9a8f7d, 0x8b8171, 0xa89b86]
 
 function generate(spec: WorldGenSpec): ResolvedScene {
   const terrain = terrainSpecFor(spec)
@@ -84,6 +86,8 @@ function generate(spec: WorldGenSpec): ResolvedScene {
   const posts = Math.max(2, total - crates - boulders)
 
   const taken: { x: number; z: number }[] = []
+  /** Wall footprints, so nothing later spawns inside one. */
+  const built: { x: number; z: number; halfX: number; halfZ: number }[] = []
   const objects: ObjectSpec[] = []
   const limit = spec.halfExtent - 2
 
@@ -129,6 +133,17 @@ function generate(spec: WorldGenSpec): ResolvedScene {
       if (Math.hypot(x, z) < CLEARING) continue
       if (slopeAt(x, z) > maxSlope) continue
       if (taken.some((p) => Math.hypot(p.x - x, p.z - z) < MIN_SEPARATION)) continue
+      // A wall covers metres, not a point, so a separation check on its centre
+      // is not enough to keep a crate from spawning inside it.
+      if (
+        built.some(
+          (b) =>
+            Math.abs(x - b.x) < b.halfX + MIN_SEPARATION &&
+            Math.abs(z - b.z) < b.halfZ + MIN_SEPARATION
+        )
+      ) {
+        continue
+      }
       taken.push({ x, z })
       return { x, z }
     }
@@ -159,6 +174,77 @@ function generate(spec: WorldGenSpec): ResolvedScene {
       mass,
       ...(fixed ? { fixed: true } : {})
     })
+  }
+
+  // Ruins go down first, because they claim ground rather than a point and
+  // everything else has to be placed around them.
+  //
+  // Axis-aligned on purpose, and not only because `ObjectSpec` has no rotation:
+  // rectilinear runs read as *built*, which is the whole reason they are here.
+  // Tall enough to block sight and refuse a jump, so they have to be routed
+  // around rather than dodged — a wall is the first thing in this world that
+  // local steering genuinely cannot solve by swerving.
+  const runs = Math.max(2, Math.round(total * 0.09))
+  let wallIndex = 0
+  let pillarIndex = 0
+
+  for (let r = 0; r < runs; r++) {
+    const anchor = place(0.22, 10)
+    if (!anchor) continue
+
+    const alongX = random() < 0.5
+    const segments = 2 + Math.floor(random() * 3)
+    let offset = -2
+
+    for (let s = 0; s < segments; s++) {
+      const length = 2.4 + random() * 2.6
+      const height = 1.7 + random() * 0.9
+      const cx = anchor.x + (alongX ? offset + length / 2 : 0)
+      const cz = anchor.z + (alongX ? 0 : offset + length / 2)
+      if (Math.abs(cx) > limit || Math.abs(cz) > limit) break
+
+      const size: [number, number, number] = alongX
+        ? [length, height, 0.55]
+        : [0.55, height, length]
+      const ground = sampledHeightAt(field, cx, cz)
+      // Sunk slightly, so an uneven footing shows as a wall standing in the
+      // ground rather than one floating above it.
+      objects.push({
+        id: `wall_${++wallIndex}`,
+        kind: 'wall',
+        color: pick(random, STONE_COLORS),
+        size,
+        position: [cx, ground + height / 2 - 0.15, cz],
+        graspable: false,
+        mass: 400,
+        fixed: true
+      })
+      built.push({ x: cx, z: cz, halfX: size[0] / 2, halfZ: size[2] / 2 })
+
+      // Gaps often enough that a run is a barrier with a way through, not a
+      // sealed box the robot can only give up against.
+      offset += length + (random() < 0.45 ? 1.6 + random() * 1.4 : 0.05)
+    }
+
+    // A standing pillar or two at the end, for a silhouette worth steering by.
+    if (random() < 0.7) {
+      const height = 2.4 + random() * 1.4
+      const px = anchor.x + (alongX ? offset + 0.6 : 1.2)
+      const pz = anchor.z + (alongX ? 1.2 : offset + 0.6)
+      if (Math.abs(px) <= limit && Math.abs(pz) <= limit) {
+        objects.push({
+          id: `pillar_${++pillarIndex}`,
+          kind: 'pillar',
+          color: pick(random, STONE_COLORS),
+          size: [0.7, height, 0.7],
+          position: [px, sampledHeightAt(field, px, pz) + height / 2 - 0.15, pz],
+          graspable: false,
+          mass: 300,
+          fixed: true
+        })
+        built.push({ x: px, z: pz, halfX: 0.35, halfZ: 0.35 })
+      }
+    }
   }
 
   // Crates are the things worth carrying, so they stay a graspable block size,

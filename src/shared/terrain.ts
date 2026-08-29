@@ -146,11 +146,9 @@ export function terrainHeightAt(spec: TerrainSpec, x: number, z: number): number
     // becomes a partial step — which is to say a ramp — so the robot strolls up
     // what was supposed to make it jump. Terraced regions are terraced fully,
     // with the transition confined to a thin border.
-    const mask = smoothstep(
-      0.52,
-      0.6,
-      fbm(x / (scale * 1.6), z / (scale * 1.6), spec.seed + 313)
-    )
+    const mask =
+      smoothstep(0.52, 0.6, fbm(x / (scale * 1.6), z / (scale * 1.6), spec.seed + 313)) *
+      rampCorridor(spec, x, z)
     if (mask > 0) {
       const stepped = Math.round(height / spec.terraceStep) * spec.terraceStep
       height += (stepped - height) * mask
@@ -169,6 +167,46 @@ export function terrainHeightAt(spec: TerrainSpec, x: number, z: number): number
   }
 
   return height
+}
+
+/** Ramps cut through the terraced ground, and how wide the cut is. */
+const RAMP_COUNT = 4
+const RAMP_HALF_WIDTH = 2.4
+const RAMP_REACH = 8
+
+/**
+ * Suppresses terracing along a few corridors, which is what a ramp is.
+ *
+ * Building ramps as objects would mean rotated colliders, and the footprint
+ * arithmetic in criteria, jump and steering all assume axis-aligned boxes. But
+ * a ramp does not need to be an object at all: leave the underlying smooth
+ * landform alone in a strip, and the terrace it crosses acquires a walkable way
+ * up. Returns 0 inside a corridor and 1 well clear of one.
+ *
+ * The point is not convenience. A plateau reachable *either* by finding the
+ * ramp or by jumping is a route choice, and which one a model takes is exactly
+ * the sort of thing worth watching.
+ */
+function rampCorridor(spec: TerrainSpec, x: number, z: number): number {
+  let nearest = Infinity
+
+  for (let k = 0; k < RAMP_COUNT; k++) {
+    const bearing = hash2(k, 1, spec.seed) * Math.PI * 2
+    const inner = spec.clearingRadius * 2
+    const reach = inner + hash2(k, 2, spec.seed) * Math.max(1, spec.halfExtent - inner - 4)
+    const cx = Math.cos(bearing) * reach
+    const cz = Math.sin(bearing) * reach
+
+    const along = hash2(k, 3, spec.seed) * Math.PI * 2
+    const ux = Math.cos(along)
+    const uz = Math.sin(along)
+
+    // Closest point on the corridor's centre line, clamped to its length.
+    const t = clamp((x - cx) * ux + (z - cz) * uz, -RAMP_REACH, RAMP_REACH)
+    nearest = Math.min(nearest, Math.hypot(x - (cx + ux * t), z - (cz + uz * t)))
+  }
+
+  return smoothstep(RAMP_HALF_WIDTH * 0.45, RAMP_HALF_WIDTH, nearest)
 }
 
 /** Peaks where the underlying noise crosses its midpoint. 0..1. */

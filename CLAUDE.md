@@ -211,6 +211,15 @@ from a hand-written one, which is what let terrain land without touching any of 
 - **Sample resolution is tied to `terraceStep`.** The collider interpolates across a cell, so a
   0.85m step spread over a 0.8m cell is a 46° ramp — inside what the robot can walk up, which
   silently turns every ledge back into a slope. Cells are kept near 0.55m for this reason.
+- **A ramp is an absence, not an object.** Ramps are corridors where terracing is suppressed, so
+  the smooth underlying landform provides a walkable way up. Building them as objects would mean
+  rotated colliders, which the footprint arithmetic cannot take. The point is the route choice:
+  a plateau reachable either by finding the ramp or by jumping is a decision worth watching.
+- **Walls are axis-aligned, and that is a feature.** `ObjectSpec` has no rotation, but rectilinear
+  runs also read as *built*, which is why they are there. They are taller than the robot so they
+  cannot be jumped and do block sight — a wall is the first thing in this world that local
+  steering genuinely cannot solve by swerving, which is what makes it a routing problem. Leave
+  gaps in a run: a sealed enclosure is something the robot can only give up against.
 - **Terrain noise is banded, not single-scale.** Broad landforms for the skyline, a ridged band
   for crests, a fine band for close ground. One band at one scale is uniformly bumpy: dull to look
   at and featureless to navigate.

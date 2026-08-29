@@ -127,6 +127,41 @@ it('terracing produces flat tops joined by steps the robot must jump', () => {
   expect(steps).toBeGreaterThan(5)
 })
 
+it('offers walkable climbs, not only ledges to jump', () => {
+  const physics = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
+  const terrain = new Terrain(ROLLING, RAPIER, physics)
+
+  // A ramp is a route that gains real height without ever presenting a step
+  // too tall to walk up. Sweep short straight paths and count how many manage it.
+  let walkableClimbs = 0
+  let bestGain = 0
+
+  for (let x = -22; x <= 22; x += 1.5) {
+    for (let z = -22; z <= 22; z += 1.5) {
+      for (const [dx, dz] of [[1, 0], [0, 1], [0.7, 0.7], [0.7, -0.7]] as const) {
+        let previous = terrain.heightAt(x, z)
+        const start = previous
+        let worstStep = 0
+        for (let s = 0.3; s <= 6; s += 0.3) {
+          const here = terrain.heightAt(x + dx * s, z + dz * s)
+          worstStep = Math.max(worstStep, here - previous)
+          previous = here
+        }
+        const gain = previous - start
+        // Nothing steeper than the robot can walk up, over the whole route.
+        if (worstStep < 0.28 && gain > 1.2) {
+          walkableClimbs++
+          bestGain = Math.max(bestGain, gain)
+        }
+      }
+    }
+  }
+
+  console.log('walkable climbs:', walkableClimbs, 'best gain:', +bestGain.toFixed(2))
+  expect(walkableClimbs).toBeGreaterThan(0)
+  expect(bestGain).toBeGreaterThan(1.2)
+})
+
 it('a flat spec is still exactly flat', () => {
   const physics = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
   const terrain = new Terrain(FLAT_TERRAIN, RAPIER, physics)

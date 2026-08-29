@@ -6,7 +6,7 @@
 
 import type { TerrainSpec } from './terrain.js'
 
-export type ObjectKind = 'block' | 'table' | 'marker' | 'boulder'
+export type ObjectKind = 'block' | 'table' | 'marker' | 'boulder' | 'wall' | 'pillar'
 
 export interface ObjectSpec {
   /** The handle the model uses. Keep it readable: `red_block`, not `obj_7`. */
