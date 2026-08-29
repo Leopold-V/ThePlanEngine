@@ -89,8 +89,22 @@ export const scan: Skill<z.infer<typeof schema>> = {
       }
     }
 
-    // Only what changed. A scan that repeats a scan should say so plainly —
-    // that is what makes a redundant one visibly worthless.
+    // In proprioceptive mode the observation names no objects at all, so this
+    // result is the model's only account of what is out there. Reporting only
+    // the differences would leave it knowing that two things exist and not
+    // where either of them is.
+    if (ctx.world.observationDetail === 'proprioceptive') {
+      const all = [...seen.entries()]
+        .map(([id, p]) => `${id} at (${p.x.toFixed(2)}, ${p.z.toFixed(2)})`)
+        .join('; ')
+      const news = found.length > 0 ? ` New since last time: ${found.length}.` : ''
+      const shifted = moved.length > 0 ? ` ${moved.join('; ')}.` : ''
+      return { ok: true, observation: `Scanned a full circle. In view: ${all}.${news}${shifted}` }
+    }
+
+    // Otherwise the observation already carries Visible and Remembered every
+    // turn, so repeating them here is pure duplication. Report only what
+    // changed — which is what makes a redundant scan visibly worthless.
     const parts: string[] = []
     if (found.length > 0) parts.push(`Found: ${found.join('; ')}.`)
     if (moved.length > 0) parts.push(`${moved.join('; ')}.`)

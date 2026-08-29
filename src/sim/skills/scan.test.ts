@@ -48,6 +48,7 @@ function scene(): {
         return sightings
       },
       now: 0,
+      observationDetail: 'full',
       groundHeightAt: () => 0
     } as unknown as WorldView,
     signal: new AbortController().signal,
@@ -126,6 +127,22 @@ it('reports what it found, then reports nothing new on a repeat', async () => {
   console.log('second:', second.observation)
   expect(second.observation).toContain('Nothing new')
   expect(second.observation).not.toContain('Found:')
+})
+
+it('still enumerates everything in proprioceptive mode, where nothing else does', async () => {
+  const { robot, ctx, step } = scene()
+  ;(ctx.world as { observationDetail: string }).observationDetail = 'proprioceptive'
+
+  await runScan(robot, ctx, step)
+  // The second scan is the one that used to say "nothing new" and strand the
+  // model, because the observation in this mode names no objects at all.
+  const second = await runScan(robot, ctx, step)
+
+  console.log('proprioceptive repeat:', second.observation)
+  expect(second.observation).toContain('In view:')
+  expect(second.observation).toContain('red_block')
+  expect(second.observation).toContain('blue_block')
+  expect(second.observation).toContain('green_block')
 })
 
 it('reports an object that moved since it was last seen', async () => {

@@ -3,6 +3,7 @@ import type { WorldModel } from './WorldModel.js'
 import type { WorldObject } from './objects.js'
 import type { CameraFrame } from './CameraView.js'
 import type { PerceptionConfig, Sighting } from './perception.js'
+import type { ObservationDetail } from '@shared/profile.js'
 
 /**
  * What a skill is allowed to know and do about the world beyond its own body.
@@ -20,6 +21,14 @@ export interface WorldView {
   /** Simulation seconds since the world started. */
   now: number
   perception: PerceptionConfig
+  /**
+   * How much the per-turn observation is allowed to say.
+   *
+   * A perception skill has to know this. In `proprioceptive` mode the
+   * observation lists no objects at all, so the skill's own result is the only
+   * channel the model has — reporting just what changed there tells it nothing.
+   */
+  observationDetail: ObservationDetail
   find(id: string): WorldObject | undefined
   /**
    * Ground height at a point. Navigation probes this a step ahead, which is

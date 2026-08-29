@@ -77,6 +77,9 @@ export class PlanEngine {
       // Sensor parameters are part of the experiment, so they come from the
       // profile rather than being fixed in the simulation.
       this.options.world.setPerception(resolved.perception)
+      // Perception skills need this too: in proprioceptive mode their own
+      // result is the only thing telling the model what is out there.
+      this.options.world.setObservationDetail(this.detail)
 
       // The observation rides along with the instruction so the model always
       // starts from where the robot actually is.

@@ -21,14 +21,16 @@ export const turn: Skill<z.infer<typeof schema>> = {
 
     const done = await until(ctx, Math.abs(degrees) / 90 + 4, () => {
       const remaining = target - robot.heading
-      if (Math.abs(remaining) < 0.02) return true
+      if (Math.abs(remaining) < 0.01) return true
       robot.setTurn(Math.sign(remaining) * Math.min(1, Math.abs(remaining) * 2))
       return false
     })
 
     robot.stop()
-    if (done) robot.heading = target
-
+    // Deliberately not `robot.heading = target`. That teleported the body to
+    // the exact angle and then reported the exact angle, so the number the
+    // model was given was true by construction rather than by measurement —
+    // and any real shortfall was invisible. Report where it actually ended up.
     return {
       ok: done,
       observation: done

@@ -58,6 +58,7 @@ export class World {
   private readonly debug = new DebugVisuals()
   private readonly cameraView = new CameraView()
   private perceptionConfig: PerceptionConfig = DEFAULT_PERCEPTION
+  private detail: ObservationDetail = 'full'
   private sightings: Sighting[] = []
   private simTime = 0
   private sincePerception = 0
@@ -122,6 +123,15 @@ export class World {
     this.rig.setPovFov(config.halfAngleDeg * 2)
     // Re-sense immediately so the next observation reflects the new sensor.
     this.updatePerception()
+  }
+
+  /**
+   * How much the observation may say. Pushed in from the resolved profile
+   * alongside the sensor settings, so perception skills can tell whether the
+   * model has any other channel to what is around it.
+   */
+  setObservationDetail(detail: ObservationDetail): void {
+    this.detail = detail
   }
 
   /** The active camera, for anything that needs to project into the view. */
@@ -236,6 +246,9 @@ export class World {
         return world.simTime
       },
       perception: this.perceptionConfig,
+      get observationDetail() {
+        return world.detail
+      },
       find: (id) => this.objects.find((o) => o.spec.id === id),
       groundHeightAt: (x, z) => this.groundHeightAt(x, z),
       capture: () => this.capture(),
