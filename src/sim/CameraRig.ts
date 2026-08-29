@@ -26,7 +26,10 @@ const POV_NEAR = 0.3
 /** Anything the camera can be pointed at. A robot satisfies it; so will the next one. */
 export interface CameraSubject {
   position: THREE.Vector3
+  /** Which way the body faces. The chase camera sits behind this. */
   heading: number
+  /** Which way the head faces. First person looks along this. */
+  sensorHeading: number
   isMoving: boolean
 }
 
@@ -114,7 +117,7 @@ export class CameraRig {
       this.camera.position.set(eye.x, eye.y + EYE_HEIGHT, eye.z)
       // Same half-turn as the robot's camera: three.js looks down local -Z,
       // heading 0 faces world +Z.
-      this.camera.rotation.set(0, subject.heading + Math.PI, 0, 'YXZ')
+      this.camera.rotation.set(0, subject.sensorHeading + Math.PI, 0, 'YXZ')
       return
     }
 

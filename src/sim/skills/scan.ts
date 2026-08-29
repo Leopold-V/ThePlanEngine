@@ -23,6 +23,9 @@ export const scan: Skill<z.infer<typeof schema>> = {
 
   async run(robot, _params, ctx): Promise<SkillResult> {
     ctx.report('Scanning surroundings')
+    // Sweep with the head straight, so the circle is measured from the body and
+    // a leftover glance cannot skew where the sweep starts and ends.
+    robot.setGazeYaw(0)
 
     // Where things were believed to be before the sweep. Snapshotted by value,
     // because perception rewrites the belief map as the robot turns.

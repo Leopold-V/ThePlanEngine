@@ -64,7 +64,9 @@ export class CameraView {
     this.camera.far = Math.max(20, perception.range * 2)
     // A three.js camera looks down its local -Z, but heading 0 faces world +Z,
     // so the yaw needs half a turn or the robot photographs what is behind it.
-    this.camera.rotation.set(0, robot.heading + Math.PI, 0, 'YXZ')
+    // Sensor heading, not body heading: the camera is in the head and turns
+    // with it, which is what makes a glance to one side mean anything.
+    this.camera.rotation.set(0, robot.sensorHeading + Math.PI, 0, 'YXZ')
     this.camera.updateProjectionMatrix()
     this.camera.updateMatrixWorld(true)
 

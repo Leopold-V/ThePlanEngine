@@ -34,8 +34,11 @@ export function describe(robot: Robot, model?: WorldModel, sightings?: Sighting[
   // whether it is on high or low ground, which nothing else in the report says.
   const elevation =
     Math.abs(robot.position.y) > 0.1 ? `, at height ${robot.position.y.toFixed(2)}m` : ''
+  // Only when it is off centre. The sensors are in the head, so a turned neck
+  // changes what "visible" means and the planner has to know about it.
+  const neck = Math.abs(robot.gazeYaw) > 0.05 ? `, head turned ${describeNeck(robot.gazeYaw)}` : ''
   const lines = [
-    `Robot at (${o.x}, ${o.z}) facing ${o.heading}°${elevation}. ` +
+    `Robot at (${o.x}, ${o.z}) facing ${o.heading}°${elevation}${neck}. ` +
       `Holding: ${o.holding ?? 'nothing'}.`
   ]
 
@@ -80,6 +83,11 @@ function bearingWords(deg: number): string {
   if (magnitude < 8) return 'straight ahead'
   if (magnitude < 35) return `slightly ${side}`
   return `to the ${side}`
+}
+
+function describeNeck(radians: number): string {
+  const degrees = Math.round((radians * 180) / Math.PI)
+  return `${Math.abs(degrees)}° to the ${degrees < 0 ? 'left' : 'right'}`
 }
 
 function round(n: number): number {

@@ -70,7 +70,9 @@ export class Robot {
   private effort = 0
   private crouch = 0
   private idleClock = 0
-  private gazeTarget: THREE.Vector3 | null = null
+  /** Commanded neck angle relative to the body, and where the neck actually is. */
+  private gazeCommand = 0
+  private gazeYaw_ = 0
 
   heading = 0
 
@@ -183,13 +185,33 @@ export class Robot {
     return new THREE.Vector3(p.x, p.y + HEAD_HEIGHT + 0.28, p.z)
   }
 
+  /** The furthest the neck turns either way. */
+  static readonly MAX_GAZE = MAX_GAZE_YAW
+
   /**
-   * What the head follows. Driven from perception rather than from skills, so
-   * the robot watches what it can actually see without any skill needing to
-   * know that a head exists.
+   * Points the head, relative to the body. This is a sensor command, not an
+   * animation: the eyes, the camera and the field of view all follow the neck,
+   * so turning the head really is looking somewhere else.
    */
-  setGaze(point: THREE.Vector3 | null): void {
-    this.gazeTarget = point
+  setGazeYaw(radians: number): void {
+    this.gazeCommand = THREE.MathUtils.clamp(radians, -MAX_GAZE_YAW, MAX_GAZE_YAW)
+  }
+
+  /** Where the neck actually is, which lags the command. */
+  get gazeYaw(): number {
+    return this.gazeYaw_
+  }
+
+  /**
+   * The direction the robot is sensing in: body plus neck.
+   *
+   * Everything that perceives uses this rather than `heading`. A humanoid turns
+   * its head to look around and does not swivel its whole body to glance, and
+   * for a while here the head turned while the sensors stayed bolted to the
+   * chest — so the robot visibly looked at things it could not see.
+   */
+  get sensorHeading(): number {
+    return this.heading + this.gazeYaw_
   }
 
   /** Where a carried object rides: in front of the chest, at carry height. */
@@ -221,7 +243,9 @@ export class Robot {
     this.turnRate = 0
     this.effort = 0
     this.crouch = 0
-    this.gazeTarget = null
+    this.gazeCommand = 0
+    this.gazeYaw_ = 0
+    this.head.rotation.set(0, 0, 0)
     // Clear any lean left over from the previous run's last movement.
     this.mesh.rotation.set(0, heading, 0)
     this.body.setTranslation({ x, y: groundY + CENTER_HEIGHT, z }, true)
@@ -410,33 +434,17 @@ export class Robot {
   }
 
   /**
-   * Turns the head toward whatever it is watching, within the range a neck
-   * actually has. Beyond that it gives up and centres rather than straining,
-   * which is also the honest signal: the robot is not looking at the thing.
+   * Eases the neck toward where it has been told to point.
+   *
+   * The neck has no pitch on purpose. Perception has no vertical limit — it is
+   * a horizontal cone — so a head that tilted would aim a camera at things the
+   * field of view does not cull, which is the same mismatch between what the
+   * robot appears to look at and what it actually senses that mounting the
+   * sensors here was meant to remove.
    */
   private updateGaze(settle: number): void {
-    let yaw = 0
-    let pitch = 0
-
-    if (this.gazeTarget) {
-      const p = this.position
-      const dx = this.gazeTarget.x - p.x
-      const dz = this.gazeTarget.z - p.z
-      const flat = Math.hypot(dx, dz)
-      let bearing = Math.atan2(dx, dz) - this.heading
-      while (bearing > Math.PI) bearing -= Math.PI * 2
-      while (bearing < -Math.PI) bearing += Math.PI * 2
-
-      if (Math.abs(bearing) <= MAX_GAZE_YAW && flat > 0.15) {
-        yaw = bearing
-        const rise = this.gazeTarget.y - (p.y + HEAD_HEIGHT)
-        pitch = THREE.MathUtils.clamp(Math.atan2(rise, flat), -MAX_GAZE_PITCH, MAX_GAZE_PITCH)
-      }
-    }
-
-    this.head.rotation.y += (yaw - this.head.rotation.y) * settle
-    // Positive pitch on the head tips the face down, so looking up is negative.
-    this.head.rotation.x += (-pitch - this.head.rotation.x) * settle
+    this.gazeYaw_ += (this.gazeCommand - this.gazeYaw_) * settle
+    this.head.rotation.y = this.gazeYaw_
   }
 }
 

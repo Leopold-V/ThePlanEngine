@@ -69,6 +69,15 @@ v0.3 scoring will hang off, so anything that changes what the model sees must go
 Settings hold *how to reach a model*; the profile holds *what the model is asked*. Do not add
 prompt- or capability-affecting fields to `Settings`.
 
+**Planned: hardware as a profile choice.** `perception` (range, field of view, occlusion) is the
+seed of a larger idea — that what the robot is *built from* should be a variable, not a constant.
+A head camera with a human-like cone is one loadout; a 360° lidar on the head is another, and a
+real one: Unitree ship the G1 and H1 with exactly that, while Figure and Optimus are deliberately
+camera-only. Picking between them is a design decision worth exposing rather than baking in.
+Extend `perception` into a sensor loadout when this lands — do not add a parallel concept, and do
+not make a wide sensor the default, because a 360° sensor quietly deletes the perception problem
+the app exists to pose.
+
 ## The two extension points
 
 Adding either should touch exactly two files. If a change requires editing `PlanEngine`, that is a
@@ -114,6 +123,16 @@ it generates the JSON Schema sent to the model *and* validates the arguments tha
 
 Rules that are easy to break:
 
+- **The sensors are in the head, not the chest.** `robot.sensorHeading` is body heading plus neck
+  angle, and perception, `CameraView` and the first-person camera all use it. Never decide what
+  can be seen from `robot.heading` — that was how it worked once, and the robot visibly turned its
+  head toward things it was not sensing with. The neck reaches ±70° and deliberately has no pitch,
+  because perception is a horizontal cone with no vertical limit and a tilted camera would show
+  what the field of view does not cull.
+- **A glance is not a turn.** `look(direction)` aims the neck without moving the feet, and returns
+  it to centre before finishing — waited out, not fired and forgotten, since the observation that
+  follows reports the neck angle. Turning the whole body to look around is what `scan` is for, and
+  it should stay the expensive option.
 - **`look` returns a labelled image.** Object ids are drawn into the frame because every
   coordinate skill needs numbers the model cannot get from pixels — the labels are what make
   `approach(red_block)` possible from vision alone. Do not remove them.

@@ -223,8 +223,13 @@ v0.1 is the loop. The reason the project exists is what comes after it.
       over, elevation in what it senses, and locomotion that says what blocked it
 - [x] **v0.7** — navigation from the belief map: steering around what it has actually seen,
       slope avoidance by local probing, and arrivals that name what they went around
+- [x] **v0.7.1** — the sensors move into the head: a glance turns the neck, not the whole body,
+      and the camera and field of view follow it
 - [ ] **v0.8** — talking to it mid-task: interrupt and redirect a run in progress
 - [ ] **v0.9** — recording and replay; deterministic reruns
+- [ ] **later** — hardware as a configuration: the sensor loadout becomes a profile choice —
+      head camera, 360° lidar, mounting and field of view — so what the robot is *built from* is
+      a variable rather than a constant
 
 ## Contributing
 

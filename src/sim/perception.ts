@@ -72,8 +72,9 @@ export function perceive(
     const distance = Math.hypot(dx, dz)
     if (distance > config.range || distance < 1e-4) continue
 
-    // Signed angle between the robot's heading and the object.
-    let bearing = Math.atan2(dx, dz) - robot.heading
+    // Signed angle between where the robot is looking and the object. The head,
+    // not the chest — the sensors are mounted in it.
+    let bearing = Math.atan2(dx, dz) - robot.sensorHeading
     while (bearing > Math.PI) bearing -= Math.PI * 2
     while (bearing < -Math.PI) bearing += Math.PI * 2
 

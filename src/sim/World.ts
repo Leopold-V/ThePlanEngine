@@ -340,15 +340,6 @@ export class World {
     )
     this.model.update(this.sightings, this.simTime)
 
-    // The head follows the nearest thing it can actually see — not what it is
-    // holding, which would just make it stare at its own hands.
-    let watching: Sighting | null = null
-    for (const sighting of this.sightings) {
-      if (sighting.id === this.robot.held?.spec.id) continue
-      if (!watching || sighting.distance < watching.distance) watching = sighting
-    }
-    this.robot.setGaze(watching ? watching.position.clone() : null)
-
     if (this.debug.group.visible) {
       const visible = new Set(this.sightings.map((s) => s.id))
       for (const object of this.objects) {
@@ -405,7 +396,8 @@ export class World {
       }
 
       for (const object of this.objects) object.syncMesh()
-      this.debug.update(this.robot.position, this.robot.heading)
+      // The wedge shows where the sensors point, which is the head.
+      this.debug.update(this.robot.position, this.robot.sensorHeading)
       this.followWithLight()
 
       // Framing runs on the frame delta, not the fixed step: it is direction,
