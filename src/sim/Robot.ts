@@ -32,6 +32,26 @@ export class Robot {
   private readonly leftLeg: THREE.Group
   private readonly rightLeg: THREE.Group
 
+  /**
+   * Above this the robot is somewhere it should not be able to reach: autostep
+   * is capped at 0.3m and there is no jump, so anything higher means the
+   * character controller climbed something it should have been blocked by.
+   */
+  private static readonly CLIMB_ANOMALY_HEIGHT = 0.4
+
+  /**
+   * Captured the first frame the robot ends up impossibly high, with whatever
+   * the controller collided with on that frame. Reproducing the climb has so
+   * far failed, so the next occurrence needs to explain itself.
+   */
+  climbReport: {
+    height: number
+    position: { x: number; z: number }
+    headingDeg: number
+    holding: string | null
+    collisions: { colliderHandle: number; normal: { x: number; y: number; z: number } }[]
+  } | null = null
+
   private forwardInput = 0
   private turnInput = 0
   private waving = false
@@ -98,6 +118,7 @@ export class Robot {
   /** Places the robot at a starting pose. Used when a scenario resets the world. */
   teleport(x: number, z: number, heading: number): void {
     this.stop()
+    this.climbReport = null
     this.heading = heading
     this.verticalVelocity = 0
     this.gait = 0
@@ -173,10 +194,24 @@ export class Robot {
       z: Math.cos(this.heading) * speed * dt
     }
 
-    this.controller.computeColliderMovement(this.collider_, desired)
+    // The carried object rides in front of the chest, well inside the range of
+    // the character controller's shape cast. Left in, the controller treats it
+    // as an obstacle and — since a block is exactly the autostep height — steps
+    // onto the very thing the robot is holding, climbing itself upward a step
+    // at a time until it ends up on top of the furniture.
+    const held = this.heldObject?.collider.handle
+    this.controller.computeColliderMovement(
+      this.collider_,
+      desired,
+      undefined,
+      undefined,
+      held === undefined ? undefined : (c) => c.handle !== held
+    )
     const moved = this.controller.computedMovement()
 
     if (this.controller.computedGrounded()) this.verticalVelocity = 0
+
+    this.captureClimbAnomaly()
 
     const t = this.body.translation()
     this.body.setNextKinematicTranslation({
@@ -193,6 +228,31 @@ export class Robot {
     }
 
     this.syncMesh(dt, Math.abs(speed))
+  }
+
+  /** Records what the controller hit the first time the robot is impossibly high. */
+  private captureClimbAnomaly(): void {
+    if (this.climbReport) return
+    const height = this.body.translation().y - CENTER_HEIGHT
+    if (height <= Robot.CLIMB_ANOMALY_HEIGHT) return
+
+    const collisions: { colliderHandle: number; normal: { x: number; y: number; z: number } }[] = []
+    for (let i = 0; i < this.controller.numComputedCollisions(); i++) {
+      const collision = this.controller.computedCollision(i)
+      if (collision?.collider) {
+        collisions.push({ colliderHandle: collision.collider.handle, normal: collision.normal1 })
+      }
+    }
+
+    const p = this.position
+    this.climbReport = {
+      height: Number(height.toFixed(3)),
+      position: { x: Number(p.x.toFixed(2)), z: Number(p.z.toFixed(2)) },
+      headingDeg: Number(this.headingDegrees.toFixed(0)),
+      holding: this.heldObject?.spec.id ?? null,
+      collisions
+    }
+    console.warn('[plan-engine] robot reached an impossible height', this.climbReport)
   }
 
   private syncMesh(dt: number, speed: number): void {
