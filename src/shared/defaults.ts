@@ -19,8 +19,9 @@ export const DEFAULT_SETTINGS: Settings = {
       id: 'anthropic',
       label: 'Anthropic',
       kind: 'anthropic',
-      model: 'claude-sonnet-5',
-      requiresKey: true
+      model: 'claude-opus-5',
+      requiresKey: true,
+      allowAmbientAuth: true
     },
     {
       id: 'openai',

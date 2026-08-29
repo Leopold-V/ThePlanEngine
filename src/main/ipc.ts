@@ -26,7 +26,7 @@ export function registerIpc(): void {
         error: `Unknown provider "${req.providerId}".`
       }
     }
-    if (settings.requiresKey && !settings.apiKey) {
+    if (settings.requiresKey && !settings.apiKey && !settings.allowAmbientAuth) {
       return {
         text: null,
         toolCalls: [],

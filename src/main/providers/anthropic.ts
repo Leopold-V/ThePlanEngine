@@ -36,8 +36,10 @@ export const anthropicProvider: ModelProvider = {
 
   async send({ settings, system, messages, tools }: SendArgs): Promise<ModelReply> {
     try {
+      // Omit apiKey entirely when unset so the SDK can resolve an ambient
+      // credential. An empty string would shadow it and authenticate as empty.
       const client = new Anthropic({
-        apiKey: settings.apiKey ?? '',
+        ...(settings.apiKey ? { apiKey: settings.apiKey } : {}),
         ...(settings.baseURL ? { baseURL: settings.baseURL } : {})
       })
 
@@ -73,6 +75,14 @@ export const anthropicProvider: ModelProvider = {
         }
       }
     } catch (err) {
+      if (!settings.apiKey && err instanceof Anthropic.AuthenticationError) {
+        return errorReply(
+          new Error(
+            'No Anthropic credential found. Paste an API key in Settings, or set ' +
+              'ANTHROPIC_API_KEY, or run `ant auth login` and restart the app.'
+          )
+        )
+      }
       return errorReply(err)
     }
   }

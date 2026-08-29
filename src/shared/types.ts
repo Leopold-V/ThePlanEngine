@@ -86,6 +86,14 @@ export interface ProviderSettings {
   apiKey?: string
   /** Local servers (Ollama, LM Studio) need no key. */
   requiresKey: boolean
+  /**
+   * Provider can authenticate from the ambient environment when no key is
+   * entered — `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, or an OAuth profile
+   * from `ant auth login`. The adapter must then omit `apiKey` entirely:
+   * passing an empty string still wins its precedence slot and authenticates
+   * as an empty key, shadowing every ambient credential.
+   */
+  allowAmbientAuth?: boolean
 }
 
 export interface Settings {

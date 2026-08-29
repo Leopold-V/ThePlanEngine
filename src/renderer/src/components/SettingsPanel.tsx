@@ -59,7 +59,11 @@ export function SettingsPanel({ settings, onSave, onClose }: Props): React.JSX.E
                   placeholder={active.apiKey === STORED_KEY ? 'Stored — leave blank to keep' : 'sk-…'}
                   onChange={(e) => patchActive({ apiKey: e.target.value })}
                 />
-                <small>Stored encrypted by your OS keychain. It never reaches the renderer.</small>
+                <small>
+                  Stored encrypted by your OS keychain. It never reaches the renderer.
+                  {active.allowAmbientAuth &&
+                    ' Leave blank to use ANTHROPIC_API_KEY or an `ant auth login` profile.'}
+                </small>
               </label>
             ) : (
               <label>
