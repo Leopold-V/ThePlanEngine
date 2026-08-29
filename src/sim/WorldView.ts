@@ -1,6 +1,7 @@
 import type { Robot } from './Robot.js'
 import type { WorldModel } from './WorldModel.js'
 import type { WorldObject } from './objects.js'
+import type { CameraFrame } from './CameraView.js'
 import type { PerceptionConfig, Sighting } from './perception.js'
 
 /**
@@ -20,6 +21,8 @@ export interface WorldView {
   now: number
   perception: PerceptionConfig
   find(id: string): WorldObject | undefined
+  /** Renders the robot's eye view, with visible objects labelled. */
+  capture(): CameraFrame | null
   grasp(object: WorldObject): void
   /** Releases the held object at a ground position. Returns what was dropped. */
   release(x: number, z: number): WorldObject | null

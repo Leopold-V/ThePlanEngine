@@ -17,7 +17,21 @@ function toAnthropicMessages(messages: Message[]): Anthropic.MessageParam[] {
           return {
             type: 'tool_result' as const,
             tool_use_id: p.id,
-            content: p.content,
+            // Anthropic accepts image blocks inside a tool result, so a photo
+            // can sit exactly where the model asked for it.
+            content: p.image
+              ? [
+                  { type: 'text' as const, text: p.content },
+                  {
+                    type: 'image' as const,
+                    source: {
+                      type: 'base64' as const,
+                      media_type: p.image.mediaType as 'image/jpeg',
+                      data: p.image.base64
+                    }
+                  }
+                ]
+              : p.content,
             is_error: p.isError ?? false
           }
       }

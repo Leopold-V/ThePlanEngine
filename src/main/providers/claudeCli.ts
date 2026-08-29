@@ -108,6 +108,14 @@ function renderConversation(messages: Message[]): string {
           break
         case 'tool_result':
           lines.push(`[result${part.isError ? ' — FAILED' : ''}] ${part.content}`)
+          if (part.image) {
+            // The CLI takes text on stdin; there is nowhere for a frame to go.
+            // Say so rather than let the model wonder why it cannot see.
+            lines.push(
+              '[note] A photo was taken, but this provider cannot show you images. ' +
+                'Rely on the text observation, or switch to a provider with vision.'
+            )
+          }
           break
       }
     }

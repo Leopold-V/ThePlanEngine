@@ -24,6 +24,8 @@ export interface SkillResult {
   ok: boolean
   /** Handed back to the model as the tool result. Keep it short and factual. */
   observation: string
+  /** A rendered frame, for skills that return a picture rather than a sentence. */
+  image?: { mediaType: string; base64: string }
 }
 
 /**

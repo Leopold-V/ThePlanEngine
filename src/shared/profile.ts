@@ -27,6 +27,21 @@ export interface PerceptionSettings {
   occlusion?: boolean
 }
 
+/**
+ * How much the robot is told without having to look.
+ *
+ * - `full` — pose, grip, visible objects and remembered ones. Simulates a
+ *   classical perception stack feeding a planner.
+ * - `proprioceptive` — pose and grip only, which is what encoders and a gripper
+ *   sensor give for free. Objects must be found with `look`, and memory lives in
+ *   the model's own context rather than the engine's world model.
+ *
+ * The second is what a vision-language-action model actually gets, and it is
+ * the only one that scales: a text manifest grows with the world, an image does
+ * not.
+ */
+export type ObservationDetail = 'full' | 'proprioceptive'
+
 export interface RobotProfile {
   id: string
   name: string
@@ -46,6 +61,8 @@ export interface RobotProfile {
   skills: Record<string, SkillOverride>
   maxIterations?: number
   perception?: PerceptionSettings
+  /** Absent means `full`, so existing profiles and scenarios are unchanged. */
+  observationDetail?: ObservationDetail
 }
 
 export const DEFAULT_PROFILE: RobotProfile = {

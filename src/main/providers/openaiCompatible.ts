@@ -16,6 +16,21 @@ function toOpenAIMessages(system: string, messages: Message[]): ChatCompletionMe
     const toolResults = m.parts.filter((p) => p.type === 'tool_result')
     for (const r of toolResults) {
       out.push({ role: 'tool', tool_call_id: r.id, content: r.content })
+
+      // A `tool` message may only carry text on this API, so a photo has to
+      // follow as a user turn rather than sit inside the result.
+      if (r.image) {
+        out.push({
+          role: 'user',
+          content: [
+            { type: 'text', text: `Photo returned by ${r.id}:` },
+            {
+              type: 'image_url',
+              image_url: { url: `data:${r.image.mediaType};base64,${r.image.base64}` }
+            }
+          ]
+        })
+      }
     }
 
     const text = m.parts

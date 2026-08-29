@@ -152,6 +152,29 @@ export function RobotPanel({ profile, onChange, onReset, onClose }: Props): Reac
               </small>
             </label>
 
+            <h3>Sensing mode</h3>
+            <label>
+              What the robot is told without looking
+              <select
+                value={resolved.observationDetail}
+                onChange={(e) =>
+                  onChange({
+                    ...profile,
+                    observationDetail: e.target.value as 'full' | 'proprioceptive'
+                  })
+                }
+              >
+                <option value="full">Full — pose, plus visible and remembered objects</option>
+                <option value="proprioceptive">Proprioceptive — pose and grip only</option>
+              </select>
+              <small>
+                Full simulates a detection-and-mapping stack feeding a planner. Proprioceptive
+                gives only what a robot senses of itself, so objects must be found with{' '}
+                <code>look</code> — which is what a vision-language-action model actually gets,
+                and the only mode that scales to a large world.
+              </small>
+            </label>
+
             <h3>Perception</h3>
             <p className="muted small">
               The robot only sees what is in front of it. Narrowing this is a real experiment —

@@ -3,12 +3,15 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import RAPIER from '@dimforge/rapier3d-compat'
 import { Robot } from './Robot.js'
 import { WorldModel } from './WorldModel.js'
+import { CameraView } from './CameraView.js'
 import { DebugVisuals } from './debugVisuals.js'
 import { describe } from './observe.js'
 import { DEFAULT_SCENE, WorldObject, type SceneDefinition } from './objects.js'
 import { DEFAULT_PERCEPTION, perceive, type PerceptionConfig, type Sighting } from './perception.js'
 import type { WorldView } from './WorldView.js'
 import type { WorldSnapshot } from '@shared/scenario.js'
+import type { ObservationDetail } from '@shared/profile.js'
+import type { CameraFrame } from './CameraView.js'
 
 const GROUND_HALF_EXTENT = 25
 const FIXED_STEP = 1 / 60
@@ -45,6 +48,7 @@ export class World {
   readonly model = new WorldModel()
 
   private readonly debug = new DebugVisuals()
+  private readonly cameraView = new CameraView()
   private perceptionConfig: PerceptionConfig = DEFAULT_PERCEPTION
   private sightings: Sighting[] = []
   private simTime = 0
@@ -138,9 +142,42 @@ export class World {
     return this.simTime
   }
 
-  /** The robot's full sensory report, as the model receives it. */
-  observationText(): string {
-    return describe(this.robot, this.model, this.sightings, this.simTime)
+  /**
+   * The robot's sensory report, as the model receives it.
+   *
+   * `proprioceptive` reports only pose and grip — what encoders and a gripper
+   * sensor give you for free. Everything else has to be earned with `look`,
+   * which is the point: a text manifest of every object does not scale to a
+   * large world, and an image does.
+   */
+  observationText(detail: ObservationDetail = 'full'): string {
+    return detail === 'proprioceptive'
+      ? describe(this.robot)
+      : describe(this.robot, this.model, this.sightings, this.simTime)
+  }
+
+  /** Renders the robot's eye view. Off-screen and on demand. */
+  capture(): CameraFrame | null {
+    // The operator's debug overlay is not part of the world, and the camera
+    // sits inside the robot's own head — neither belongs in the photo. A
+    // carried object stays visible, because you do see what you are holding.
+    const debugWasVisible = this.debug.group.visible
+    this.debug.group.visible = false
+    this.robot.mesh.visible = false
+
+    try {
+      return this.cameraView.capture(
+        this.renderer,
+        this.scene,
+        this.robot,
+        this.objects,
+        this.sightings,
+        this.perceptionConfig
+      )
+    } finally {
+      this.robot.mesh.visible = true
+      this.debug.group.visible = debugWasVisible
+    }
   }
 
   /**
@@ -164,6 +201,7 @@ export class World {
       },
       perception: this.perceptionConfig,
       find: (id) => this.objects.find((o) => o.spec.id === id),
+      capture: () => this.capture(),
       grasp: (object) => this.grasp(object),
       release: (x, z) => this.release(x, z)
     }

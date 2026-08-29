@@ -1,9 +1,24 @@
-import type { RobotProfile } from '@shared/profile.js'
+import type { ObservationDetail, RobotProfile } from '@shared/profile.js'
 import type { ToolSchema } from '@shared/types.js'
 import { DEFAULT_PERCEPTION, type PerceptionConfig } from '@sim/perception.js'
 import { jsonSchemaOf } from '@sim/skills/registry.js'
 import type { Skill, SkillCategory } from '@sim/skills/types.js'
 import { DEFAULT_MAX_ITERATIONS, DEFAULT_SYSTEM_PROMPT } from './prompt.js'
+
+/**
+ * Appended in `proprioceptive` mode. Without it the model waits for an object
+ * list that is never coming, and never thinks to take a photo.
+ */
+const PROPRIOCEPTIVE_NOTE = `
+SENSING
+- You are NOT told what objects exist or where they are. Your observation gives only your own
+  position, heading and whether you are holding something — that is all your body senses directly.
+- To find out what is around you, use 'look' to take a photo. Objects in shot are labelled with
+  their id, and you can use those ids with 'approach' and 'face'.
+- Nothing remembers things for you. If you saw an object in an earlier photo and still need it,
+  rely on what you noted then, or look again.
+- Prefer 'move_forward', 'approach' and 'face' over coordinate-based movement: you generally do
+  not know the coordinates of what you can see.`
 
 export interface ResolvedSkill {
   name: string
@@ -21,6 +36,7 @@ export interface ResolvedConfig {
   systemPrompt: string
   maxIterations: number
   perception: PerceptionConfig
+  observationDetail: ObservationDetail
   /** Every skill, disabled ones included — the panel needs the full list. */
   skills: ResolvedSkill[]
   /** Enabled skills only, in the shape providers hand to the model. */
@@ -60,9 +76,15 @@ export function resolveProfile(
 
   const enabled = resolved.filter((s) => s.enabled)
 
+  const detail: ObservationDetail = profile.observationDetail ?? 'full'
+  const basePrompt = profile.systemPrompt?.trim() || DEFAULT_SYSTEM_PROMPT
+
   return {
-    systemPrompt: profile.systemPrompt?.trim() || DEFAULT_SYSTEM_PROMPT,
+    // The mode note is appended rather than baked in, so editing the prompt
+    // cannot leave the model believing it will be told things it will not be.
+    systemPrompt: detail === 'proprioceptive' ? `${basePrompt}\n${PROPRIOCEPTIVE_NOTE}` : basePrompt,
     maxIterations: profile.maxIterations ?? DEFAULT_MAX_ITERATIONS,
+    observationDetail: detail,
     perception: {
       range: profile.perception?.range ?? DEFAULT_PERCEPTION.range,
       halfAngleDeg: profile.perception?.halfAngleDeg ?? DEFAULT_PERCEPTION.halfAngleDeg,
@@ -92,6 +114,7 @@ export function fingerprint(config: ResolvedConfig): string {
     systemPrompt: config.systemPrompt,
     maxIterations: config.maxIterations,
     perception: config.perception,
+    observationDetail: config.observationDetail,
     tools: config.tools
   })
 

@@ -18,11 +18,25 @@ export interface ToolCallPart {
   args: Record<string, unknown>
 }
 
+/** A rendered frame, carried alongside text. Base64 with no `data:` prefix. */
+export interface ImagePayload {
+  mediaType: string
+  base64: string
+}
+
 export interface ToolResultPart {
   type: 'tool_result'
   id: string
   /** Serialized observation handed back to the model. */
   content: string
+  /**
+   * Set by skills that return a picture, such as `look`. Providers differ on
+   * how an image reaches the model — Anthropic puts it inside the tool result,
+   * OpenAI-compatible servers only accept text there and need a following user
+   * message — so the neutral format keeps it attached to the result and lets
+   * each adapter place it.
+   */
+  image?: ImagePayload
   isError?: boolean
 }
 

@@ -95,6 +95,32 @@ it generates the JSON Schema sent to the model *and* validates the arguments tha
   Heading in radians internally, degrees at every boundary the model sees.
 - Model IDs live in `src/shared/defaults.ts`. Do not hardcode them elsewhere.
 
+## Vision and sensing modes
+
+`observationDetail` on the profile decides how much the robot is told without looking:
+
+- `full` — pose, grip, visible and remembered objects. A classical detection-and-mapping stack
+  feeding a planner. Default; every existing scenario relies on it.
+- `proprioceptive` — pose and grip only, which is what encoders and a gripper sensor give for
+  free. Objects must be found with `look`, and memory lives in the model's context rather than the
+  engine's world model. This is what a VLA actually gets, and the only mode that scales: a text
+  manifest grows with the world, an image does not.
+
+Rules that are easy to break:
+
+- **`look` returns a labelled image.** Object ids are drawn into the frame because every
+  coordinate skill needs numbers the model cannot get from pixels — the labels are what make
+  `approach(red_block)` possible from vision alone. Do not remove them.
+- **Two action vocabularies coexist.** `walk_to`/`put_down` take absolute coordinates and suit
+  `full` mode; `move_forward`/`approach`/`face` are egocentric and suit vision. Adding a
+  coordinate-only skill makes the robot less usable in `proprioceptive` mode.
+- **The camera hides the debug overlay and the robot's own mesh**, but not a carried object — you
+  do see what you are holding.
+- **Images are stripped from old history** (`IMAGE_HISTORY` in `PlanEngine`). History is resent
+  every turn, so without it a ten-step task carries ten screenshots on every request.
+- Providers differ: Anthropic takes an image inside a tool result, OpenAI-compatible needs a
+  following user message, and `claude-cli` cannot carry one at all and says so.
+
 ## Scenarios and scoring
 
 A scenario is a document (`shared/scenario.ts`): scene, goal, and success criteria. Criteria are

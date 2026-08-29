@@ -1,5 +1,9 @@
 import { z } from 'zod'
+import { approach } from './approach.js'
+import { face } from './face.js'
+import { look } from './look.js'
 import { lookAt } from './lookAt.js'
+import { moveForward } from './moveForward.js'
 import { pickUp } from './pickUp.js'
 import { putDown } from './putDown.js'
 import { say } from './say.js'
@@ -18,7 +22,25 @@ import { wave } from './wave.js'
  * which is where type safety is actually enforced.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const SKILLS: Skill<any>[] = [walkTo, turn, lookAt, scan, pickUp, putDown, wave, say]
+export const SKILLS: Skill<any>[] = [
+  // Absolute-coordinate movement, for when the observation supplies positions.
+  walkTo,
+  turn,
+  lookAt,
+  // Egocentric movement, for when the robot is working from photographs and has
+  // no absolute frame to name.
+  moveForward,
+  approach,
+  face,
+  // Perception.
+  scan,
+  look,
+  // Manipulation and expression.
+  pickUp,
+  putDown,
+  wave,
+  say
+]
 
 /**
  * The JSON Schema the model is shown for a skill, generated from its zod

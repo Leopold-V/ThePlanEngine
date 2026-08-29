@@ -1,4 +1,4 @@
-import type { RobotProfile } from '@shared/profile.js'
+import type { ObservationDetail, RobotProfile } from '@shared/profile.js'
 import type { Message, ModelReply, Part, SendRequest, ToolResultPart } from '@shared/types.js'
 import type { World } from '@sim/World.js'
 import { SKILLS } from '@sim/skills/registry.js'
@@ -43,6 +43,8 @@ export class PlanEngine {
   private readonly queue: SkillQueue
   private messages: Message[] = []
   private controller: AbortController | null = null
+  /** Set from the resolved profile at the start of each run. */
+  private detail: ObservationDetail = 'full'
 
   constructor(private readonly options: PlanEngineOptions) {
     this.queue = new SkillQueue(options.world)
@@ -65,9 +67,20 @@ export class PlanEngine {
     this.emit('user', instruction)
 
     try {
+      // Resolve the configuration before the first observation, since the
+      // profile decides how much that observation is allowed to say.
+      const { providerId, profile } = this.options.config()
+      const resolved = resolveProfile(profile, SKILLS)
+      const { maxIterations, tools, enabled } = resolved
+      this.detail = resolved.observationDetail
+
+      // Sensor parameters are part of the experiment, so they come from the
+      // profile rather than being fixed in the simulation.
+      this.options.world.setPerception(resolved.perception)
+
       // The observation rides along with the instruction so the model always
       // starts from where the robot actually is.
-      const opening = this.options.world.observationText()
+      const opening = this.options.world.observationText(this.detail)
       this.messages.push({
         role: 'user',
         parts: [{ type: 'text', text: `${instruction}\n\n[${opening}]` }]
@@ -75,14 +88,6 @@ export class PlanEngine {
       // Surfaced, not just sent: without seeing what the robot perceived you
       // cannot tell a perception failure from a reasoning failure.
       this.emit('observation', opening)
-
-      const { providerId, profile } = this.options.config()
-      const resolved = resolveProfile(profile, SKILLS)
-      const { maxIterations, tools, enabled } = resolved
-
-      // Sensor parameters are part of the experiment, so they come from the
-      // profile rather than being fixed in the simulation.
-      this.options.world.setPerception(resolved.perception)
 
       // Provenance: names exactly what the model was shown for this run.
       this.emit(
@@ -101,7 +106,7 @@ export class PlanEngine {
         const reply = await this.options.send({
           providerId,
           system: resolved.systemPrompt,
-          messages: this.messages,
+          messages: withRecentImagesOnly(this.messages),
           tools
         })
 
@@ -139,6 +144,7 @@ export class PlanEngine {
             type: 'tool_result',
             id: call.id,
             content: result.observation,
+            ...(result.image ? { image: result.image } : {}),
             isError: !result.ok
           })
         }
@@ -217,7 +223,7 @@ export class PlanEngine {
    */
   private pushResults(results: ToolResultPart[]): void {
     if (results.length === 0) return
-    const observation = this.options.world.observationText()
+    const observation = this.options.world.observationText(this.detail)
     this.messages.push({
       role: 'user',
       parts: [...results, { type: 'text', text: observation }]
@@ -234,6 +240,38 @@ export class PlanEngine {
       ...(ok === undefined ? {} : { ok })
     })
   }
+}
+
+/** Images kept in history. Beyond this, only the text of a photo survives. */
+const IMAGE_HISTORY = 2
+
+/**
+ * Strips images from all but the most recent few tool results.
+ *
+ * History is resent in full on every turn, so without this a ten-step task
+ * carries ten screenshots on every subsequent request — dominating both the
+ * context window and the bill. The text of each photo is kept, so the model
+ * still knows it looked and what was labelled.
+ */
+function withRecentImagesOnly(messages: Message[]): Message[] {
+  const withImages: ToolResultPart[] = []
+  for (const message of messages) {
+    for (const part of message.parts) {
+      if (part.type === 'tool_result' && part.image) withImages.push(part)
+    }
+  }
+  if (withImages.length <= IMAGE_HISTORY) return messages
+
+  const keep = new Set(withImages.slice(-IMAGE_HISTORY).map((p) => p.id))
+
+  return messages.map((message) => ({
+    ...message,
+    parts: message.parts.map((part) => {
+      if (part.type !== 'tool_result' || !part.image || keep.has(part.id)) return part
+      const { image: _dropped, ...rest } = part
+      return { ...rest, content: `${part.content} [earlier photo omitted]` }
+    })
+  }))
 }
 
 function formatCall(name: string, args: Record<string, unknown>): string {

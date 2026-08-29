@@ -181,7 +181,8 @@ v0.1 is the loop. The reason the project exists is what comes after it.
       grasping
 - [x] **v0.3** — scenarios with data-predicate success criteria, run records carrying the config
       fingerprint, and pass rates grouped by scenario, configuration and model
-- [ ] **v0.4** — vision input (render the robot's camera back to multimodal models)
+- [x] **v0.4** — vision: a `look()` skill returning a labelled camera frame, egocentric actions,
+      and a proprioceptive sensing mode where objects must be found rather than listed
 - [ ] **v0.5** — recording and replay; deterministic reruns
 
 ## Contributing
