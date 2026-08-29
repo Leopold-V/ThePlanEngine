@@ -19,6 +19,12 @@ export interface ObjectSpec {
   position: [number, number, number]
   graspable: boolean
   mass: number
+  /**
+   * Fixed in place. Furniture should not slide when the robot brushes past it —
+   * a drifting table is unrealistic and, worse, a moving reference point in a
+   * benchmark.
+   */
+  fixed?: boolean
 }
 
 export interface SceneDefinition {
@@ -42,7 +48,8 @@ export const DEFAULT_SCENE: SceneDefinition = {
       size: [1.6, 0.75, 1.0],
       position: [5, 0.375, 1],
       graspable: false,
-      mass: 40
+      mass: 40,
+      fixed: true
     },
     {
       id: 'red_block',
@@ -78,7 +85,8 @@ export const DEFAULT_SCENE: SceneDefinition = {
       size: [0.2, 1.4, 0.2],
       position: [7, 0.7, -6],
       graspable: false,
-      mass: 5
+      mass: 5,
+      fixed: true
     }
   ]
 }
@@ -111,11 +119,13 @@ export class WorldObject {
     this.mesh.receiveShadow = true
 
     this.body = physics.createRigidBody(
-      rapier.RigidBodyDesc.dynamic()
-        .setTranslation(...spec.position)
-        // Objects that settle should stay settled rather than jitter forever.
-        .setLinearDamping(0.4)
-        .setAngularDamping(0.6)
+      (spec.fixed
+        ? rapier.RigidBodyDesc.fixed()
+        : rapier.RigidBodyDesc.dynamic()
+            // Objects that settle should stay settled rather than jitter forever.
+            .setLinearDamping(0.4)
+            .setAngularDamping(0.6)
+      ).setTranslation(...spec.position)
     )
 
     this.collider = physics.createCollider(

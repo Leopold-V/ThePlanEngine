@@ -30,8 +30,12 @@ export function observe(robot: Robot): Observation {
  */
 export function describe(robot: Robot, model?: WorldModel, sightings?: Sighting[], now = 0): string {
   const o = observe(robot)
+  // Height is reported only when off the ground: now that there are objects to
+  // stand on, "am I elevated?" is something the planner cannot otherwise know.
+  const elevation = robot.position.y > 0.1 ? `, standing ${robot.position.y.toFixed(2)}m up` : ''
   const lines = [
-    `Robot at (${o.x}, ${o.z}) facing ${o.heading}°. Holding: ${o.holding ?? 'nothing'}.`
+    `Robot at (${o.x}, ${o.z}) facing ${o.heading}°${elevation}. ` +
+      `Holding: ${o.holding ?? 'nothing'}.`
   ]
 
   if (!model) return lines[0] as string

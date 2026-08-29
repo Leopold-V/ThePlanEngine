@@ -66,7 +66,7 @@ export function perceive(
     const bearingDeg = THREE.MathUtils.radToDeg(bearing)
     if (Math.abs(bearingDeg) > config.halfAngleDeg) continue
 
-    if (config.occlusion && !hasLineOfSight(eye, target, object, robot, physics, rapier)) continue
+    if (config.occlusion && !hasLineOfSight(eye, object, robot, physics, rapier)) continue
 
     sightings.push({
       id: object.spec.id,
@@ -81,13 +81,51 @@ export function perceive(
 }
 
 /**
- * True when the first thing the ray hits is the object itself.
+ * Points on an object worth testing for visibility: its centre, the middle of
+ * its top face, and its upper corners drawn slightly inward.
+ *
+ * Sampling only the centre made visibility far too brittle — a 1.6m table could
+ * disappear because one 30cm block happened to sit on the line to its middle.
+ * An object is visible if any part of it is.
+ */
+function samplePoints(object: WorldObject): THREE.Vector3[] {
+  const c = object.position
+  const [w, h, d] = object.spec.size
+  // Drawn in from the true corners so a ray cannot graze along a face.
+  const ix = w * 0.35
+  const iz = d * 0.35
+  const top = h * 0.45
+
+  return [
+    c,
+    new THREE.Vector3(c.x, c.y + top, c.z),
+    new THREE.Vector3(c.x + ix, c.y + top, c.z + iz),
+    new THREE.Vector3(c.x - ix, c.y + top, c.z + iz),
+    new THREE.Vector3(c.x + ix, c.y + top, c.z - iz),
+    new THREE.Vector3(c.x - ix, c.y + top, c.z - iz)
+  ]
+}
+
+/**
+ * True when any sampled point on the object is reachable by a clear ray.
  *
  * The robot's own capsule must be excluded: eye height sits inside it, so a
  * solid raycast would otherwise report an immediate self-hit and the robot
  * would perceive nothing at all.
  */
 function hasLineOfSight(
+  eye: THREE.Vector3,
+  object: WorldObject,
+  robot: Robot,
+  physics: RAPIER.World,
+  rapier: typeof RAPIER
+): boolean {
+  return samplePoints(object).some((point) =>
+    rayReaches(eye, point, object, robot, physics, rapier)
+  )
+}
+
+function rayReaches(
   eye: THREE.Vector3,
   target: THREE.Vector3,
   object: WorldObject,
