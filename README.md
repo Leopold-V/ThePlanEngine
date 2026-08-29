@@ -229,7 +229,9 @@ v0.1 is the loop. The reason the project exists is what comes after it.
       a camera has to be pointed at it to learn *what* it is
 - [x] **v0.9** — talking to it mid-task: say something while it is working and it stops, listens,
       and replans from there
-- [ ] **v0.10** — recording and replay; deterministic reruns
+- [x] **v0.10** — a world worth crossing: terraced plateaus that have to be jumped onto, banded
+      terrain with a real skyline, rocks that look like rocks, and props in clusters
+- [ ] **v0.11** — recording and replay; deterministic reruns
 - [ ] **later** — hardware as a configuration: the sensor loadout becomes a profile choice —
       head camera, 360° lidar, mounting and field of view — so what the robot is *built from* is
       a variable rather than a constant

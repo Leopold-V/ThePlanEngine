@@ -89,17 +89,21 @@ export class Terrain {
   }
 }
 
-/** Valley floor, and the tone the high ground fades to. */
+/** Valley floor, open ground, and exposed high ground. */
 const LOW = new THREE.Color(0x141824)
-const HIGH = new THREE.Color(0x39415a)
+const MID = new THREE.Color(0x2b3550)
+const HIGH = new THREE.Color(0x5a6480)
+/** Steep faces read as bare rock rather than as more of the same ground. */
+const CLIFF = new THREE.Color(0x6b6357)
 
 /**
- * Shades the ground from low to high.
+ * Shades the ground by height and by steepness.
  *
  * Not decoration: an unshaded landscape is a flat dark field in the robot's own
  * camera, which is the one view that has to carry depth. Lighting alone does
  * not do it — the key light rakes across at a fixed angle, so a slope facing
- * away from it is indistinguishable from a valley.
+ * away from it is indistinguishable from a valley. Steepness matters as much as
+ * height, because it is what marks the terrace walls the robot has to jump.
  */
 function paintByHeight(geometry: THREE.BufferGeometry, position: THREE.BufferAttribute): void {
   let lowest = Infinity
@@ -111,13 +115,22 @@ function paintByHeight(geometry: THREE.BufferGeometry, position: THREE.BufferAtt
   }
 
   const range = highest - lowest
+  const normal = geometry.attributes.normal as THREE.BufferAttribute
   const colors = new Float32Array(position.count * 3)
   const shade = new THREE.Color()
 
   for (let i = 0; i < position.count; i++) {
     // A flat world has no range to map, so it stays the single base tone.
     const t = range < 0.01 ? 0 : (position.getY(i) - lowest) / range
-    shade.copy(LOW).lerp(HIGH, t)
+    if (t < 0.5) shade.copy(LOW).lerp(MID, t * 2)
+    else shade.copy(MID).lerp(HIGH, (t - 0.5) * 2)
+
+    // An upward normal of 1 is level ground; nearer 0 is a wall.
+    const steepness = 1 - Math.min(1, Math.max(0, normal.getY(i)))
+    if (steepness > 0.25) {
+      shade.lerp(CLIFF, Math.min(1, (steepness - 0.25) * 2.2))
+    }
+
     colors[i * 3] = shade.r
     colors[i * 3 + 1] = shade.g
     colors[i * 3 + 2] = shade.b

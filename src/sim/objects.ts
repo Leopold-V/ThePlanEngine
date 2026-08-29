@@ -6,6 +6,56 @@ export type { ObjectKind, ObjectSpec, SceneDefinition } from '@shared/scene.js'
 export { DEFAULT_SCENE } from '@shared/scene.js'
 
 /**
+ * A lumpy low-poly solid, inscribed in the spec's box.
+ *
+ * The collider stays the cuboid the spec describes, deliberately: the footprint
+ * arithmetic in `criteria.ts`, `jump.ts` and `steering.ts` all assume an
+ * axis-aligned box, and a convex hull here would quietly invalidate all three.
+ * The rock is drawn *inside* that box, so the robot stops a few centimetres
+ * early rather than clipping into something — the safe direction to be wrong.
+ */
+function rockGeometry(spec: ObjectSpec): THREE.BufferGeometry {
+  const [w, h, d] = spec.size
+  const geometry = new THREE.IcosahedronGeometry(0.5, 1)
+  const position = geometry.attributes.position as THREE.BufferAttribute
+
+  // Deterministic from the id, so the same seed rebuilds the same rocks.
+  let hash = 0
+  for (let i = 0; i < spec.id.length; i++) hash = (Math.imul(hash, 31) + spec.id.charCodeAt(i)) | 0
+
+  /**
+   * Keyed by position, not by vertex index.
+   *
+   * The geometry is non-indexed — every triangle carries its own copy of each
+   * corner — so displacing by index moves the copies apart and the solid bursts
+   * into loose shards. Hashing the coordinate makes every copy of a corner move
+   * together, which is what keeps it a rock.
+   */
+  const dentAt = (x: number, y: number, z: number): number => {
+    let k = Math.imul(Math.round(x * 512), 73856093)
+    k ^= Math.imul(Math.round(y * 512), 19349663)
+    k ^= Math.imul(Math.round(z * 512), 83492791)
+    k = Math.imul(k ^ hash, 0x45d9f3b)
+    const t = Math.sin((k >>> 0) * 0.0001) * 43758.5453
+    return 0.78 + (t - Math.floor(t)) * 0.36
+  }
+
+  for (let i = 0; i < position.count; i++) {
+    const x = position.getX(i)
+    const y = position.getY(i)
+    const z = position.getZ(i)
+    const dent = dentAt(x, y, z)
+    position.setXYZ(i, x * dent, y * dent, z * dent)
+  }
+  // Rotate before scaling, so a spun rock still fits the box it is drawn in.
+  geometry.rotateY(((hash >>> 8) % 360) * (Math.PI / 180))
+  // Inscribed rather than circumscribed, so nothing pokes out of the collider.
+  geometry.scale(w * 0.96, h * 0.96, d * 0.96)
+  geometry.computeVertexNormals()
+  return geometry
+}
+
+/**
  * A spawned object: its spec, its three.js mesh, and its Rapier body.
  *
  * Bodies are dynamic so objects fall, stack and get knocked over. Carrying
@@ -26,8 +76,13 @@ export class WorldObject {
     const [w, h, d] = spec.size
 
     this.mesh = new THREE.Mesh(
-      new THREE.BoxGeometry(w, h, d),
-      new THREE.MeshStandardMaterial({ color: spec.color, roughness: 0.6, metalness: 0.1 })
+      spec.kind === 'boulder' ? rockGeometry(spec) : new THREE.BoxGeometry(w, h, d),
+      new THREE.MeshStandardMaterial({
+        color: spec.color,
+        roughness: spec.kind === 'boulder' ? 0.95 : 0.6,
+        metalness: spec.kind === 'boulder' ? 0 : 0.1,
+        flatShading: spec.kind === 'boulder'
+      })
     )
     this.mesh.castShadow = true
     this.mesh.receiveShadow = true

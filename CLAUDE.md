@@ -205,6 +205,24 @@ from a hand-written one, which is what let terrain land without touching any of 
   height for this reason.
 - Criteria are all *relative* — an object's base against a named surface's top, horizontal
   distances — so non-flat ground does not affect scoring. Keep new predicates relative too.
+- **`terraceStep` is tied to the robot's jump.** Terraces exist to give it something it must jump
+  onto rather than stroll up, so the step sits just under `Robot.MAX_JUMP_HEIGHT`. Raise it and
+  the ledges become scenery it cannot use; lower it and they become stairs.
+- **Sample resolution is tied to `terraceStep`.** The collider interpolates across a cell, so a
+  0.85m step spread over a 0.8m cell is a 46° ramp — inside what the robot can walk up, which
+  silently turns every ledge back into a slope. Cells are kept near 0.55m for this reason.
+- **Terrain noise is banded, not single-scale.** Broad landforms for the skyline, a ridged band
+  for crests, a fine band for close ground. One band at one scale is uniformly bumpy: dull to look
+  at and featureless to navigate.
+- **A zero-width ray aimed exactly down a cell boundary can pass between the two triangles that
+  meet there and report nothing.** This looks alarmingly like a hole in the ground and is not one
+  — a capsule sweeps a volume and stands on those lines quite happily. Ray-based tests must use
+  probe coordinates that do not land on a seam; `Terrain.test.ts` offsets them deliberately.
+- **A boulder's collider is the spec's box, not its mesh.** The rock is drawn inscribed inside it,
+  because the footprint arithmetic in `criteria.ts`, `jump.ts` and `steering.ts` all assume an
+  axis-aligned box. The robot stops a few centimetres early — the safe direction to be wrong.
+  Rock geometry is displaced by *position*, never by vertex index: the icosahedron is non-indexed,
+  so per-index displacement tears every shared corner apart and the solid bursts into shards.
 
 ## Navigation steers, it does not plan
 

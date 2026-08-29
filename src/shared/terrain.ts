@@ -23,6 +23,15 @@ export interface TerrainSpec {
   featureSize: number
   /** Radius around the origin held level, so a spawn is never on a slope. */
   clearingRadius: number
+  /**
+   * Height of each plateau step, in metres. 0 leaves the ground smooth.
+   *
+   * Terracing is what gives the world somewhere to climb: it flattens parts of
+   * the landscape into level tops joined by abrupt sides, so a ledge is either
+   * walked round or jumped onto rather than gently strolled up. Keep it near
+   * the robot's jump height or the terraces become scenery it cannot use.
+   */
+  terraceStep: number
 }
 
 /** What every scene written before terrain existed assumes. */
@@ -32,7 +41,8 @@ export const FLAT_TERRAIN: TerrainSpec = {
   samples: 8,
   amplitude: 0,
   featureSize: 1,
-  clearingRadius: 0
+  clearingRadius: 0,
+  terraceStep: 0
 }
 
 export function isFlat(spec: TerrainSpec): boolean {
@@ -108,12 +118,44 @@ export function sampledHeightAt(field: HeightField, x: number, z: number): numbe
   return near * (1 - fx) + far * fx
 }
 
-/** The underlying surface, before it is sampled onto the collider's grid. */
+/**
+ * The underlying surface, before it is sampled onto the collider's grid.
+ *
+ * Three bands rather than one: broad landforms carry the relief and give a
+ * skyline, a ridged band cuts the crests that make a landscape read as a
+ * landscape rather than as lumps, and a fine band keeps close ground from
+ * looking machined. One band at one scale is uniformly bumpy everywhere, which
+ * is both dull to look at and featureless to navigate.
+ */
 export function terrainHeightAt(spec: TerrainSpec, x: number, z: number): number {
   if (isFlat(spec)) return 0
 
-  const n = fbm(x / spec.featureSize, z / spec.featureSize, spec.seed)
-  let height = (n - 0.5) * 2 * spec.amplitude
+  const scale = spec.featureSize
+  const broad = (fbm(x / (scale * 2.4), z / (scale * 2.4), spec.seed) - 0.5) * 2
+  // Ridged noise: peaks where plain noise crosses its midpoint, which reads as
+  // crests and gullies instead of blobs.
+  const crests = ridged(x / (scale * 0.7), z / (scale * 0.7), spec.seed + 991) - 0.5
+  const grain = (fbm(x / (scale * 0.22), z / (scale * 0.22), spec.seed + 77) - 0.5) * 2
+
+  let height = spec.amplitude * (broad * 0.78 + crests * 0.5 + grain * 0.07)
+
+  // Terraces, where the mask says so. Only part of the map, so the world has
+  // both natural slopes and deliberate ledges rather than looking quarried.
+  if (spec.terraceStep > 0) {
+    // A narrow band on purpose. Blend terracing in gradually and every ledge
+    // becomes a partial step — which is to say a ramp — so the robot strolls up
+    // what was supposed to make it jump. Terraced regions are terraced fully,
+    // with the transition confined to a thin border.
+    const mask = smoothstep(
+      0.52,
+      0.6,
+      fbm(x / (scale * 1.6), z / (scale * 1.6), spec.seed + 313)
+    )
+    if (mask > 0) {
+      const stepped = Math.round(height / spec.terraceStep) * spec.terraceStep
+      height += (stepped - height) * mask
+    }
+  }
 
   // Level ground at the origin, easing out over the same distance again, so the
   // robot never begins a run halfway up a hill or inside one.
@@ -127,6 +169,16 @@ export function terrainHeightAt(spec: TerrainSpec, x: number, z: number): number
   }
 
   return height
+}
+
+/** Peaks where the underlying noise crosses its midpoint. 0..1. */
+function ridged(x: number, z: number, seed: number): number {
+  return 1 - Math.abs(fbm(x, z, seed) * 2 - 1)
+}
+
+function smoothstep(edge0: number, edge1: number, value: number): number {
+  const t = clamp((value - edge0) / (edge1 - edge0), 0, 1)
+  return t * t * (3 - 2 * t)
 }
 
 /** Four octaves of value noise, normalised to 0..1. */
