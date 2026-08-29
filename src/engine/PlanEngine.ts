@@ -52,8 +52,12 @@ export class PlanEngine {
     return this.controller !== null
   }
 
-  async run(instruction: string): Promise<void> {
-    if (this.running) return
+  /** Model round trips taken, and why the run ended. */
+  async run(instruction: string): Promise<{ steps: number; error?: string }> {
+    if (this.running) return { steps: 0, error: 'A run is already in progress.' }
+
+    let steps = 0
+    let failure: string | undefined
 
     const controller = new AbortController()
     this.controller = controller
@@ -89,9 +93,11 @@ export class PlanEngine {
       for (let iteration = 0; iteration < maxIterations; iteration++) {
         if (controller.signal.aborted) {
           this.emit('system', 'Stopped.')
-          return
+          failure = 'Stopped by the operator.'
+          return { steps, error: failure }
         }
 
+        steps++
         const reply = await this.options.send({
           providerId,
           system: resolved.systemPrompt,
@@ -100,8 +106,9 @@ export class PlanEngine {
         })
 
         if (reply.stopReason === 'error') {
-          this.emit('error', reply.error ?? 'The model provider failed.')
-          return
+          failure = reply.error ?? 'The model provider failed.'
+          this.emit('error', failure)
+          return { steps, error: failure }
         }
 
         const assistantParts: Part[] = []
@@ -116,7 +123,7 @@ export class PlanEngine {
         if (reply.text) this.emit('assistant', reply.text)
 
         // No tool calls means the model considers the task finished.
-        if (reply.toolCalls.length === 0) return
+        if (reply.toolCalls.length === 0) return { steps }
 
         const results: ToolResultPart[] = []
         for (const call of reply.toolCalls) {
@@ -140,17 +147,22 @@ export class PlanEngine {
           this.emit('system', 'Stopped.')
           // Still record the results so the history stays valid for a resume.
           if (results.length > 0) this.pushResults(results)
-          return
+          failure = 'Stopped by the operator.'
+          return { steps, error: failure }
         }
 
         this.pushResults(results)
 
         if (iteration === maxIterations - 1) {
-          this.emit('error', `Hit the ${maxIterations}-step limit. Raise it in Settings.`)
+          failure = `Hit the ${maxIterations}-step limit.`
+          this.emit('error', `${failure} Raise it in the robot panel.`)
         }
       }
+      return { steps, ...(failure ? { error: failure } : {}) }
     } catch (err) {
-      this.emit('error', err instanceof Error ? err.message : String(err))
+      failure = err instanceof Error ? err.message : String(err)
+      this.emit('error', failure)
+      return { steps, error: failure }
     } finally {
       this.options.world.robot.stop()
       this.controller = null

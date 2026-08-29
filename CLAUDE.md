@@ -95,10 +95,26 @@ it generates the JSON Schema sent to the model *and* validates the arguments tha
   Heading in radians internally, degrees at every boundary the model sees.
 - Model IDs live in `src/shared/defaults.ts`. Do not hardcode them elsewhere.
 
+## Scenarios and scoring
+
+A scenario is a document (`shared/scenario.ts`): scene, goal, and success criteria. Criteria are
+**data predicates** evaluated by `engine/criteria.ts` — a pure function over a plain
+`WorldSnapshot`, with no three.js, Rapier or renderer. Keep it that way; the entire score rests on
+it and it is the best-tested code in the project.
+
+- **Every criterion result carries a reason**, not just a boolean. A score you cannot diagnose is
+  not evidence. Same rule as precondition messages and the belief inspector.
+- **Criteria are checked against world state**, never against what the model claimed it did.
+- Adding a predicate means extending the `Criterion` union, `evaluateOne`, `describeCriterion` in
+  the panel, and its tests. Keep the vocabulary small.
+- Run records store the **config fingerprint**, so results stay attributable to a configuration.
+  Anything that changes what the model sees must go through `resolveProfile` or the fingerprint
+  lies.
+
 ## Verify before claiming done
 
 ```bash
-npm run typecheck
+npm run typecheck && npm test
 ```
 
 **Driving the simulation without a model.** `planEngineDebug.engine.runSkill('walk_to', {x:3, z:2})`

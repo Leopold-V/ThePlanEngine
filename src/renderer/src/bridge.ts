@@ -1,5 +1,6 @@
 import { DEFAULT_SETTINGS } from '@shared/defaults.js'
 import { DEFAULT_PROFILE, type RobotProfile } from '@shared/profile.js'
+import type { RunRecord } from '@shared/scenario.js'
 import type { ModelReply, SendRequest, Settings } from '@shared/types.js'
 
 /**
@@ -9,6 +10,7 @@ import type { ModelReply, SendRequest, Settings } from '@shared/types.js'
  * calls are unavailable, since they need the main process.
  */
 let sessionProfile: RobotProfile = DEFAULT_PROFILE
+let sessionRuns: RunRecord[] = []
 
 const browserFallback = {
   getSettings: (): Promise<Settings> => Promise.resolve(DEFAULT_SETTINGS),
@@ -22,6 +24,15 @@ const browserFallback = {
   resetProfile: (): Promise<RobotProfile> => {
     sessionProfile = { ...DEFAULT_PROFILE, revision: sessionProfile.revision }
     return Promise.resolve(sessionProfile)
+  },
+  getRuns: (): Promise<RunRecord[]> => Promise.resolve(sessionRuns),
+  saveRun: (record: RunRecord): Promise<RunRecord[]> => {
+    sessionRuns = [record, ...sessionRuns]
+    return Promise.resolve(sessionRuns)
+  },
+  clearRuns: (): Promise<RunRecord[]> => {
+    sessionRuns = []
+    return Promise.resolve(sessionRuns)
   },
   send: (_req: SendRequest): Promise<ModelReply> =>
     Promise.resolve({

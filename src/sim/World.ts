@@ -8,6 +8,7 @@ import { describe } from './observe.js'
 import { DEFAULT_SCENE, WorldObject, type SceneDefinition } from './objects.js'
 import { DEFAULT_PERCEPTION, perceive, type PerceptionConfig, type Sighting } from './perception.js'
 import type { WorldView } from './WorldView.js'
+import type { WorldSnapshot } from '@shared/scenario.js'
 
 const GROUND_HALF_EXTENT = 25
 const FIXED_STEP = 1 / 60
@@ -165,6 +166,49 @@ export class World {
       find: (id) => this.objects.find((o) => o.spec.id === id),
       grasp: (object) => this.grasp(object),
       release: (x, z) => this.release(x, z)
+    }
+  }
+
+  /**
+   * Swaps in a new scene and puts the robot at its starting pose. A scenario
+   * has to start from a known state, which the constructor-only scene loading
+   * could not provide.
+   */
+  resetTo(scene: SceneDefinition, start: { x: number; z: number; headingDeg: number }): void {
+    this.robot.hold(null)
+    for (const object of this.objects) {
+      this.scene.remove(object.mesh)
+      object.dispose(this.physics)
+    }
+    this.objects.length = 0
+
+    this.loadScene(scene)
+
+    this.robot.teleport(start.x, start.z, THREE.MathUtils.degToRad(start.headingDeg))
+    this.model.clear()
+    this.sightings = []
+    this.updatePerception()
+  }
+
+  /**
+   * Plain world state for scoring. Deliberately data-only so criteria
+   * evaluation never touches three.js, Rapier, or the renderer.
+   */
+  snapshot(): WorldSnapshot {
+    const p = this.robot.position
+    return {
+      robot: { x: p.x, z: p.z, holding: this.robot.held?.spec.id ?? null },
+      objects: this.objects.map((o) => {
+        const pos = o.position
+        return {
+          id: o.spec.id,
+          x: pos.x,
+          y: pos.y,
+          z: pos.z,
+          size: o.spec.size,
+          up: o.up
+        }
+      })
     }
   }
 

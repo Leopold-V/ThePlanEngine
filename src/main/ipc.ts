@@ -1,7 +1,9 @@
 import { ipcMain } from 'electron'
 import type { RobotProfile } from '@shared/profile.js'
+import type { RunRecord } from '@shared/scenario.js'
 import type { ModelReply, SendRequest, Settings } from '@shared/types.js'
 import { getProfile, resetProfile, saveProfile } from './profile.js'
+import { clearRuns, getRuns, saveRun } from './runs.js'
 import { getProvider } from './providers/registry.js'
 import { getSettings, resolveProvider, saveSettings } from './settings.js'
 
@@ -11,6 +13,9 @@ export const CHANNELS = {
   profileGet: 'profile:get',
   profileSave: 'profile:save',
   profileReset: 'profile:reset',
+  runsGet: 'runs:get',
+  runsSave: 'runs:save',
+  runsClear: 'runs:clear',
   modelSend: 'model:send'
 } as const
 
@@ -28,6 +33,12 @@ export function registerIpc(): void {
   )
 
   ipcMain.handle(CHANNELS.profileReset, (): RobotProfile => resetProfile())
+
+  ipcMain.handle(CHANNELS.runsGet, (): RunRecord[] => getRuns())
+
+  ipcMain.handle(CHANNELS.runsSave, (_e, record: RunRecord): RunRecord[] => saveRun(record))
+
+  ipcMain.handle(CHANNELS.runsClear, (): RunRecord[] => clearRuns())
 
   ipcMain.handle(CHANNELS.modelSend, async (_e, req: SendRequest): Promise<ModelReply> => {
     const settings = resolveProvider(req.providerId)

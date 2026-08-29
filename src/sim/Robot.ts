@@ -95,6 +95,17 @@ export class Robot {
     this.heldObject = object
   }
 
+  /** Places the robot at a starting pose. Used when a scenario resets the world. */
+  teleport(x: number, z: number, heading: number): void {
+    this.stop()
+    this.heading = heading
+    this.verticalVelocity = 0
+    this.gait = 0
+    this.body.setTranslation({ x, y: CENTER_HEIGHT, z }, true)
+    this.body.setNextKinematicTranslation({ x, y: CENTER_HEIGHT, z })
+    this.syncMesh(0, 0)
+  }
+
   // --- state read by skills and by observe() ---------------------------------
 
   get position(): THREE.Vector3 {

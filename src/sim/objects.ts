@@ -1,95 +1,9 @@
 import * as THREE from 'three'
 import type RAPIER from '@dimforge/rapier3d-compat'
+import type { ObjectSpec } from '@shared/scene.js'
 
-export type ObjectKind = 'block' | 'table' | 'marker'
-
-/**
- * A thing in the world, as data. Scenes are declared rather than constructed so
- * that a v0.3 scenario — a scene plus a goal plus success criteria — can be a
- * document rather than code.
- */
-export interface ObjectSpec {
-  /** The handle the model uses. Keep it readable: `red_block`, not `obj_7`. */
-  id: string
-  kind: ObjectKind
-  color: number
-  /** Full extents in metres. */
-  size: [number, number, number]
-  /** Centre position at spawn. */
-  position: [number, number, number]
-  graspable: boolean
-  mass: number
-  /**
-   * Fixed in place. Furniture should not slide when the robot brushes past it —
-   * a drifting table is unrealistic and, worse, a moving reference point in a
-   * benchmark.
-   */
-  fixed?: boolean
-}
-
-export interface SceneDefinition {
-  id: string
-  name: string
-  objects: ObjectSpec[]
-}
-
-/**
- * Objects are spread well beyond a single field of view, so finding them is a
- * real part of the task rather than a formality.
- */
-export const DEFAULT_SCENE: SceneDefinition = {
-  id: 'blocks-and-table',
-  name: 'Blocks and a table',
-  objects: [
-    {
-      id: 'table',
-      kind: 'table',
-      color: 0x8b6b4a,
-      size: [1.6, 0.75, 1.0],
-      position: [5, 0.375, 1],
-      graspable: false,
-      mass: 40,
-      fixed: true
-    },
-    {
-      id: 'red_block',
-      kind: 'block',
-      color: 0xe0524d,
-      size: [0.3, 0.3, 0.3],
-      position: [2, 0.15, 3],
-      graspable: true,
-      mass: 1
-    },
-    {
-      id: 'blue_block',
-      kind: 'block',
-      color: 0x4c7dff,
-      size: [0.3, 0.3, 0.3],
-      position: [-4, 0.15, 2],
-      graspable: true,
-      mass: 1
-    },
-    {
-      id: 'green_block',
-      kind: 'block',
-      color: 0x38d39f,
-      size: [0.3, 0.3, 0.3],
-      position: [-2, 0.15, -5],
-      graspable: true,
-      mass: 1
-    },
-    {
-      id: 'marker_post',
-      kind: 'marker',
-      color: 0xf5c451,
-      size: [0.2, 1.4, 0.2],
-      position: [7, 0.7, -6],
-      graspable: false,
-      mass: 5,
-      fixed: true
-    }
-  ]
-}
+export type { ObjectKind, ObjectSpec, SceneDefinition } from '@shared/scene.js'
+export { DEFAULT_SCENE } from '@shared/scene.js'
 
 /**
  * A spawned object: its spec, its three.js mesh, and its Rapier body.
@@ -153,6 +67,18 @@ export class WorldObject {
   }
 
   /**
+   * The body's local up axis in world space. Its y component is the cosine of
+   * how far the object has tipped, which is how "still upright" is scored.
+   */
+  get up(): { x: number; y: number; z: number } {
+    const r = this.body.rotation()
+    const v = new THREE.Vector3(0, 1, 0).applyQuaternion(
+      new THREE.Quaternion(r.x, r.y, r.z, r.w)
+    )
+    return { x: v.x, y: v.y, z: v.z }
+  }
+
+  /**
    * Carrying drives the body kinematically. It still pushes dynamic bodies
    * around, but nothing can knock it loose — the accepted trade for keeping
    * joint solving out of the critical path.
@@ -179,5 +105,12 @@ export class WorldObject {
     const r = this.body.rotation()
     this.mesh.position.set(t.x, t.y, t.z)
     this.mesh.quaternion.set(r.x, r.y, r.z, r.w)
+  }
+
+  /** Removes the body from physics and frees the mesh. Used when loading a scene. */
+  dispose(physics: RAPIER.World): void {
+    physics.removeRigidBody(this.body)
+    this.mesh.geometry.dispose()
+    ;(this.mesh.material as THREE.Material).dispose()
   }
 }

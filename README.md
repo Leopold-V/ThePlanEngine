@@ -95,6 +95,26 @@ Expect ~5-9s per model call from process startup. Fine for a robot sim, not for 
 > development and testing. It is not a way to resell or share subscription access, and the
 > API providers above exist for anything beyond personal use.
 
+## Scenarios
+
+A scenario is a task plus a way to tell whether the robot did it — a scene, a goal handed to the
+model verbatim, and success criteria checked against world state when the run ends:
+
+```ts
+criteria: [
+  { type: 'object_on', object: 'red_block', surface: 'table' },
+  { type: 'holding', object: null }
+]
+```
+
+Criteria are **data predicates**, not code and not an LLM judge, so a score is deterministic, free
+to compute, and reproducible from the document alone. Every result carries a reason rather than a
+bare boolean — *"red_block is at (2.1, 3.0), outside the table footprint"*.
+
+Each run is recorded with its scenario, model, step count, transcript, and the **config
+fingerprint** of the robot profile that produced it. Results group by *(scenario, config, model)*
+so a pass rate accumulates: models are stochastic, and one run is an anecdote.
+
 ## Running it
 
 ```bash
@@ -159,8 +179,8 @@ v0.1 is the loop. The reason the project exists is what comes after it.
       with a config fingerprint stamped on every run
 - [x] **v0.2** — objects, field-of-view perception with occlusion, a persistent world model, and
       grasping
-- [ ] **v0.3** — **scenarios and scoring**: fixed tasks, success criteria, and a leaderboard
-      comparing models on the same embodied benchmark
+- [x] **v0.3** — scenarios with data-predicate success criteria, run records carrying the config
+      fingerprint, and pass rates grouped by scenario, configuration and model
 - [ ] **v0.4** — vision input (render the robot's camera back to multimodal models)
 - [ ] **v0.5** — recording and replay; deterministic reruns
 
