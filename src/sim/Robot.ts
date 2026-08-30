@@ -11,6 +11,19 @@ const WALK_SPEED = 1.4
 const TURN_SPEED = Math.PI // rad/s
 /** Keeps the feet on the floor over bumps and down small steps. */
 const SNAP_DISTANCE = 0.3
+/**
+ * How high a vertical step the robot walks up without being asked.
+ *
+ * Tied to the block size, not chosen for itself: blocks are 0.5m precisely so
+ * that one is a stride and two are a jump, and this is the number that makes
+ * the first half of that true. Raise it past a metre and the ledges the world
+ * builds stop being decisions.
+ */
+const STEP_HEIGHT = 0.55
+/** How fast a step is climbed. A block in about a third of a second. */
+const STEP_CLIMB_RATE = 1.8
+/** How far in front of the capsule the ground is felt for a step. */
+const STEP_REACH = CAPSULE_RADIUS + 0.2
 /** Steeper than this cannot be walked up; steeper than the second, it slides. */
 const MAX_CLIMB_ANGLE = Math.PI / 4
 const MIN_SLIDE_ANGLE = Math.PI * 0.3
@@ -46,6 +59,8 @@ export class Robot {
   private readonly controller: RAPIER.KinematicCharacterController
   private heldObject: WorldObject | null = null
   private readonly rapier: typeof RAPIER
+  /** Kept for the step probe, which has to ask the world what is underfoot. */
+  private readonly physics: RAPIER.World
 
   private readonly leftArm: THREE.Group
   private readonly rightArm: THREE.Group
@@ -78,6 +93,7 @@ export class Robot {
 
   constructor(rapier: typeof RAPIER, world: RAPIER.World) {
     this.rapier = rapier
+    this.physics = world
     this.mesh = buildHumanoidMesh()
     // Yaw first, then the cosmetic lean and bank, or the two fight each other.
     this.mesh.rotation.order = 'YXZ'
@@ -96,6 +112,10 @@ export class Robot {
     )
 
     this.controller = world.createCharacterController(0.01)
+    // Left enabled for small bumps, but it is not what climbs a block: Rapier's
+    // autostep will not lift this capsule 0.5m at any combination of height,
+    // min width, controller offset, snap distance or timestep that was tried.
+    // `stepAhead` does that; see `update`.
     this.controller.enableAutostep(0.3, 0.2, true)
     this.controller.enableSnapToGround(SNAP_DISTANCE)
     this.controller.setApplyImpulsesToDynamicBodies(true)
@@ -308,6 +328,64 @@ export class Robot {
 
   // --- per-frame -------------------------------------------------------------
 
+  /**
+   * How far the ground rises just in front of the feet, when that rise is a
+   * step rather than a wall. Zero when there is nothing to climb.
+   *
+   * This exists because Rapier's autostep does not lift this capsule over a
+   * 0.5m block — not at any height, min width, controller offset, snap distance
+   * or timestep that was measured. Since blocks are 0.5m and the whole point of
+   * that size is that one is a stride, the robot walked into the smallest
+   * feature the terrain can make and stopped dead against it.
+   *
+   * Only static geometry counts. You step onto ground and ledges; clambering up
+   * a crate you were walking over to pick up is not a step, it is a bug.
+   */
+  private stepAhead(): number {
+    const t = this.body.translation()
+    const feet = t.y - CENTER_HEIGHT
+    const x = t.x + Math.sin(this.heading) * STEP_REACH
+    const z = t.z + Math.cos(this.heading) * STEP_REACH
+    const onlyStatic = (c: RAPIER.Collider): boolean => {
+      const parent = c.parent()
+      return parent === null || parent.isFixed()
+    }
+
+    // Downward from just above the tallest step allowed, so the first thing hit
+    // is the surface the foot would land on.
+    const top = feet + STEP_HEIGHT + 0.1
+    const down = this.physics.castRay(
+      new this.rapier.Ray({ x, y: top, z }, { x: 0, y: -1, z: 0 }),
+      STEP_HEIGHT + 0.2,
+      true,
+      undefined,
+      undefined,
+      this.collider_,
+      undefined,
+      onlyStatic
+    )
+    if (!down) return 0
+
+    const rise = top - down.timeOfImpact - feet
+    // Below the first bound the controller copes on its own; above the second
+    // it is a wall, and walls are what jumping is for.
+    if (rise <= 0.06 || rise > STEP_HEIGHT) return 0
+
+    // Nothing to hit its head on up there. The world has caves in it, and
+    // stepping up into a ceiling would wedge the robot inside the rock.
+    const headroom = this.physics.castRay(
+      new this.rapier.Ray({ x, y: feet + rise + 0.05, z }, { x: 0, y: 1, z: 0 }),
+      CENTER_HEIGHT * 2,
+      true,
+      undefined,
+      undefined,
+      this.collider_,
+      undefined,
+      onlyStatic
+    )
+    return headroom ? 0 : rise
+  }
+
   update(dt: number): void {
     this.turnRate = ease(this.turnRate, this.turnInput * TURN_SPEED, TURN_ACCELERATION * dt)
     this.heading += this.turnRate * dt
@@ -323,9 +401,15 @@ export class Robot {
     const speed = this.speed
     this.verticalVelocity += GRAVITY * dt
 
+    // Climbing a step is a deliberate lift, not a fall interrupted — gravity is
+    // held off while the foot is going up, or the two fight and the robot
+    // shuffles at the ledge instead of mounting it.
+    const climb = this.airborne_ || speed <= 0 ? 0 : this.stepAhead()
+    if (climb > 0) this.verticalVelocity = 0
+
     const desired = {
       x: Math.sin(this.heading) * speed * dt,
-      y: this.verticalVelocity * dt,
+      y: climb > 0 ? Math.min(climb, STEP_CLIMB_RATE * dt) : this.verticalVelocity * dt,
       z: Math.cos(this.heading) * speed * dt
     }
 

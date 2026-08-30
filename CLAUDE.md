@@ -236,6 +236,16 @@ there is no second way for a scene to have ground.
   heightfield is proposing more objects on a bumpy sheet.
 - **Blocks are 0.5m because the robot is 1.6m, steps 0.55m and jumps 1.1m** — one block is a
   stride, two is a jump. Change the block size and those become nonsense together.
+- **The stride half of that is `Robot.stepAhead`, not Rapier's autostep.** Rapier will not lift
+  this capsule over a 0.5m step at any combination of autostep height, min width, controller
+  offset, snap distance or timestep — all measured, all stuck in the same place. So the robot
+  raycasts for the ledge in front of its own feet and lifts itself. Until this existed, every
+  single-block step — the *smallest* feature the terrain can produce — was a wall the robot walked
+  into and stopped dead against, which looked exactly like the collider being wrong.
+  `step.test.ts` pins one block up, two blocks blocked, and both the things that must not happen:
+  clambering onto cargo, and stepping up into a ceiling in a cave.
+- **The step probe only counts static geometry.** A crate is 0.4m and would otherwise be inside
+  the step height, so the robot would climb the cargo it was walking over to pick up.
 - **The mesh and the collider are built in one pass from the same faces**, so what the robot walks
   into cannot drift from what is drawn. Verified by raycast at 0.0000m, which the heightfield
   never managed.
