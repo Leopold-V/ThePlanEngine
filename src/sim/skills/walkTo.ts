@@ -37,6 +37,7 @@ export const walkTo: Skill<z.infer<typeof schema>> = {
     const wentRound = new Set<string>()
     let blocked = false
     let trappedFor = 0
+    let cause: { by: 'obstacle' | 'ground' | null; rise: number } = { by: null, rise: 0 }
 
     const arrived = await until(ctx, budget, () => {
       const remaining = robot.distanceTo(x, z)
@@ -52,6 +53,7 @@ export const walkTo: Skill<z.infer<typeof schema>> = {
       // Every direction obstructed. Give it a moment in case the way clears as
       // the robot shifts, then stop rather than crawling into the barrier.
       trappedFor = steer.trapped ? trappedFor + 1 / 60 : 0
+      if (steer.trapped) cause = { by: steer.blockedBy, rise: steer.riseAhead }
       if (trappedFor > TRAPPED_SECONDS) {
         blocked = true
         return true
@@ -80,13 +82,25 @@ export const walkTo: Skill<z.infer<typeof schema>> = {
 
     const remaining = robot.distanceTo(x, z).toFixed(2)
     if (blocked) {
+      // What stopped it decides what it should try. Telling a robot sitting in
+      // a hollow to go round is worse than useless — the way out is up, and it
+      // needs the height to judge that against what it can jump.
+      if (cause.by === 'ground') {
+        return {
+          ok: false,
+          observation:
+            `Blocked ${remaining}m short of the target — the ground just ahead rises ` +
+            `${cause.rise.toFixed(2)}m within a stride, too steep to walk up. ` +
+            `${at}. Jumping may clear it, or look for a gentler way round.`
+        }
+      }
+
       const culprit = obstacleAhead(ctx)
       return {
         ok: false,
         observation:
           `Blocked ${remaining}m short of the target — stopped making progress. ` +
-          `${culprit ? `${culprit}. ` : 'Nothing is visible ahead, so it may be a steep slope. '}` +
-          `${at}. Try going round it.`
+          `${culprit ? `${culprit}. ` : ''}${at}. Try going round it.`
       }
     }
 

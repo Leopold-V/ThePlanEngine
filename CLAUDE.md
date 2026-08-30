@@ -252,8 +252,14 @@ from a hand-written one, which is what let terrain land without touching any of 
   the whole world would let the robot route around something it has never seen, which contradicts
   the field of view, the belief map and proprioceptive mode. If a change needs ground truth to
   navigate, it is the wrong change.
-- **Ground is probed one step ahead and no further.** Feeling the slope you are about to step on
-  is proprioception; querying distant ground is sight, and sight is earned with `look`.
+- **Ground is probed one stride ahead and no further.** Feeling the slope you are about to step
+  on is proprioception; querying distant ground is sight, and sight is earned with `look`. The
+  stride is *shorter* than the obstacle lookahead on purpose: measuring the rise over the full
+  probe averages a wall of earth into a gentle gradient — a 1.4m step 2.4m away reads as a slope
+  of 0.58, under the limit — so the robot walks into it and never reports terrain as the blocker.
+- **What blocks the robot decides what it is told to try.** "Go round it" is right for a boulder
+  and actively wrong in a hollow, where the way out is up. `Steer.blockedBy` separates the two,
+  and the ground case reports the rise in metres so the model can weigh it against its jump.
 - **Directional sampling, not a repulsion field.** A repulsion vector from an obstacle dead ahead
   is exactly opposite the seek vector; they cancel and the robot walks calmly into it. Scoring
   discrete candidate headings has no such degenerate case.

@@ -37,7 +37,8 @@ export const jump: Skill<z.infer<typeof schema>> = {
   name: 'jump',
   category: 'locomotion',
   description:
-    'Jump up, and optionally forward. Use it to clear a low obstacle, or to get on top of ' +
+    'Jump up, and optionally forward. Use it to clear a low obstacle, to get out of a dip or ' +
+    'gully you cannot walk out of, or to get on top of ' +
     'something too tall to walk onto: stand close, face it, then jump higher than it is tall ' +
     'and far enough forward to come down on top of it. The result says what you landed on, so ' +
     'if you end up back on the ground, try again higher or closer.',

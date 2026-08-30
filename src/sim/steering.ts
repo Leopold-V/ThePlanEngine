@@ -53,12 +53,31 @@ export interface Steer {
    * before the distance test notices it has got nowhere.
    */
   trapped: boolean
+  /**
+   * What is in the way when `trapped` — a thing, or the shape of the ground.
+   *
+   * The difference decides what the robot should be told to try. "Go round it"
+   * is right for a boulder and actively wrong in a hollow, where the answer is
+   * to jump out.
+   */
+  blockedBy: 'obstacle' | 'ground' | null
+  /** Metres the ground climbs over the probe, when that is what stops it. */
+  riseAhead: number
 }
 
 /** Body half-width plus a margin, so it rounds corners rather than scraping. */
 const CLEARANCE = 0.55
-/** How far ahead a candidate direction is tested. */
+/** How far ahead a candidate direction is tested for things in the way. */
 const LOOKAHEAD = 2.4
+/**
+ * How far ahead the *ground* is felt — a stride, not the whole probe.
+ *
+ * Measuring the rise over the full lookahead averages a wall of earth into a
+ * gentle gradient: a 1.4m step 2.4m away reads as a slope of 0.58, under the
+ * limit, so the robot walks cheerfully into it and never reports terrain as
+ * what stopped it. This is meant to be the ground it is about to step on.
+ */
+const GROUND_PROBE = 1.0
 /** Beyond this an obstacle is not worth considering this frame. */
 const RELEVANT = 8
 /** Rise over run the robot steers away from — below the controller's 45° limit. */
@@ -101,7 +120,7 @@ export function steerToward(
   )
   const groundHere = around.groundHeightAt(from.x, from.z)
 
-  let best = { heading: seek, cost: Infinity, offsetDeg: 0, blocked: false }
+  let best = { heading: seek, cost: Infinity, offsetDeg: 0, obstructed: false, rise: 0 }
   // What is in the way of going straight at the target — which is the thing
   // being avoided. The chosen path is by definition the clear one, so reading
   // the answer off that would report nothing on every successful detour.
@@ -136,12 +155,26 @@ export function steerToward(
 
     // Only the ground it is about to step on: probing further would be sight,
     // and sight has to be earned.
-    const rise = around.groundHeightAt(tipX, tipZ) - groundHere
-    const slope = rise / reach
-    if (slope > SLOPE_LIMIT) cost += (slope - SLOPE_LIMIT) * SLOPE_WEIGHT
+    const stride = Math.min(GROUND_PROBE, reach)
+    const rise =
+      around.groundHeightAt(
+        from.x + Math.sin(heading) * stride,
+        from.z + Math.cos(heading) * stride
+      ) - groundHere
+    const slope = rise / stride
+    const tooSteep = slope > SLOPE_LIMIT
+    if (tooSteep) cost += (slope - SLOPE_LIMIT) * SLOPE_WEIGHT
 
     if (offsetDeg === 0) inTheWay = worst?.id ?? null
-    if (cost < best.cost) best = { heading, cost, offsetDeg, blocked: worst !== null }
+    if (cost < best.cost) {
+      best = {
+        heading,
+        cost,
+        offsetDeg,
+        obstructed: worst !== null,
+        rise: tooSteep ? rise : 0
+      }
+    }
   }
 
   // Swerving hard at full pace overshoots the turn and clips the thing being
@@ -153,7 +186,11 @@ export function steerToward(
     heading: best.heading,
     forward,
     avoiding: best.offsetDeg === 0 ? null : inTheWay,
-    trapped: best.blocked
+    trapped: best.obstructed || best.rise > 0,
+    // A thing in the way takes precedence: it is the more specific answer, and
+    // the one the robot can name.
+    blockedBy: best.obstructed ? 'obstacle' : best.rise > 0 ? 'ground' : null,
+    riseAhead: best.rise
   }
 }
 
