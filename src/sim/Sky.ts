@@ -17,7 +17,9 @@ export class Sky {
   /** What fog should be tinted with, so terrain dissolves into the horizon. */
   readonly horizon: THREE.Color
 
-  constructor(zenith = 0x0a0f1c, horizon = 0x3b4a66, ground = 0x141824) {
+  // Deep indigo overhead, a sodium haze at eye level, near-black below: the
+  // light in this world comes from the ground up, not from a sun.
+  constructor(zenith = 0x0a1020, horizon = 0xa2603a, ground = 0x0a0c11) {
     this.horizon = new THREE.Color(horizon)
 
     this.mesh = new THREE.Mesh(

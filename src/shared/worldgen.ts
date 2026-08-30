@@ -5,6 +5,7 @@ import {
   FLAT_TERRAIN,
   type TerrainSpec
 } from './terrain.js'
+import { generateVoxelWorld, type VoxelWorld } from './voxel.js'
 
 /**
  * Turns a seed into a world.
@@ -23,10 +24,29 @@ import {
 export interface ResolvedScene {
   objects: ObjectSpec[]
   terrain: TerrainSpec
+  /** Present when the scene is a volume. The world draws this instead. */
+  voxel?: VoxelWorld
 }
 
-/** Collapses either kind of scene document into contents the world can load. */
+/** Collapses every kind of scene document into contents the world can load. */
 export function resolveScene(scene: SceneDefinition): ResolvedScene {
+  if (scene.voxel) {
+    const voxel = generateVoxelWorld(scene.voxel)
+    return {
+      voxel,
+      // Props stand on the blocks. Exactly on them, since a column scan gives
+      // the true top face rather than an interpolated guess.
+      objects: (scene.objects ?? []).map((spec) => ({
+        ...spec,
+        position: [
+          spec.position[0],
+          voxel.groundHeightAt(spec.position[0], spec.position[2]) + spec.size[1] / 2,
+          spec.position[2]
+        ] as [number, number, number]
+      })),
+      terrain: FLAT_TERRAIN
+    }
+  }
   if (scene.generate) return generate(scene.generate)
   return {
     objects: scene.objects ?? [],

@@ -6,6 +6,7 @@ import { CameraRig, type CameraMode } from './CameraRig.js'
 import { CameraView } from './CameraView.js'
 import { Hud, type BubbleTone } from './Hud.js'
 import { Terrain } from './Terrain.js'
+import { VoxelTerrain } from './VoxelTerrain.js'
 import { Sky } from './Sky.js'
 import { resolveScene } from '@shared/worldgen.js'
 import type { TerrainSpec } from '@shared/terrain.js'
@@ -57,6 +58,7 @@ export class World {
   private readonly hud: Hud
   private readonly sky = new Sky()
   private terrain: Terrain | null = null
+  private voxels: VoxelTerrain | null = null
   private readonly debug = new DebugVisuals()
   private readonly cameraView = new CameraView()
   private perceptionConfig: PerceptionConfig = DEFAULT_PERCEPTION
@@ -324,22 +326,34 @@ export class World {
    * rather than assume zero — the world has not been flat since v0.6.
    */
   groundHeightAt(x: number, z: number): number {
+    if (this.voxels) return this.voxels.heightAt(x, z)
     return this.terrain?.heightAt(x, z) ?? 0
   }
 
   /** Metres from the centre of the world to its edge. */
   get halfExtent(): number {
+    if (this.voxels) return this.voxels.world.spec.halfExtent
     return this.terrain?.spec.halfExtent ?? GROUND_HALF_EXTENT
   }
 
   private loadScene(scene: SceneDefinition): void {
-    // Enumerated or generated, this is where the two become the same thing.
+    // Enumerated, generated or voxel: this is where they become one thing.
     const resolved = resolveScene(scene)
 
     this.terrain?.dispose(this.scene, this.physics)
-    this.terrain = new Terrain(resolved.terrain, RAPIER, this.physics)
-    this.terrain.addTo(this.scene)
-    this.applyFog(resolved.terrain)
+    this.terrain = null
+    this.voxels?.dispose(this.scene, this.physics)
+    this.voxels = null
+
+    if (resolved.voxel) {
+      this.voxels = new VoxelTerrain(resolved.voxel, RAPIER, this.physics)
+      this.voxels.addTo(this.scene)
+      this.applyHaze(resolved.voxel.spec.halfExtent)
+    } else {
+      this.terrain = new Terrain(resolved.terrain, RAPIER, this.physics)
+      this.terrain.addTo(this.scene)
+      this.applyHaze(resolved.terrain.halfExtent)
+    }
 
     for (const spec of resolved.objects) {
       const object = new WorldObject(spec, RAPIER, this.physics)
@@ -349,10 +363,10 @@ export class World {
   }
 
   /** Keeps the far haze just past the edge, whatever size the world is. */
-  private applyFog(spec: TerrainSpec): void {
-    // Tinted to the horizon, so distance dissolves into sky instead of into
+  private applyHaze(halfExtent: number): void {
+    // Tinted to the horizon, so distance dissolves into smog instead of into
     // a dark band that reads as the edge of the map.
-    this.scene.fog = new THREE.Fog(this.sky.horizon, spec.halfExtent * 0.75, spec.halfExtent * 2.6)
+    this.scene.fog = new THREE.Fog(this.sky.horizon, halfExtent * 0.55, halfExtent * 2.2)
   }
 
   private updatePerception(): void {
@@ -448,6 +462,7 @@ export class World {
     this.rig.dispose()
     this.hud.dispose()
     this.terrain?.dispose(this.scene, this.physics)
+    this.voxels?.dispose(this.scene, this.physics)
     this.sky.dispose()
     this.debug.dispose()
     this.renderer.dispose()

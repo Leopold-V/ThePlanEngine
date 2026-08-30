@@ -5,6 +5,7 @@
  */
 
 import type { TerrainSpec } from './terrain.js'
+import { DEFAULT_VOXEL, type VoxelSpec } from './voxel.js'
 
 export type ObjectKind = 'block' | 'table' | 'marker' | 'boulder' | 'wall' | 'pillar' | 'tree'
 
@@ -57,6 +58,11 @@ export interface SceneDefinition {
   generate?: WorldGenSpec
   /** Absent means the flat plane every scene written before terrain assumes. */
   terrain?: TerrainSpec
+  /**
+   * A volume of blocks instead of a sheet of heights. Takes precedence over
+   * `terrain`, and is the only representation that can hold a cave.
+   */
+  voxel?: VoxelSpec
 }
 
 const table = (position: [number, number, number]): ObjectSpec => ({
@@ -87,16 +93,17 @@ const block = (
 export const BLOCK_COLORS = { red: 0xe0524d, blue: 0x4c7dff, green: 0x38d39f } as const
 
 /**
- * The world the app opens in: generated, so there is somewhere to go and
- * something to climb rather than a plane with five things on it.
+ * The world the app opens in.
  *
- * Four numbers, and they rebuild it identically anywhere. Change the seed for a
- * different world.
+ * The seed is rolled fresh each launch, so the sandbox is somewhere new every
+ * time — which is the whole point of generating it. Scenarios do the opposite
+ * and pin their seeds, because a task whose world changes underneath it cannot
+ * be compared between runs.
  */
 export const DEFAULT_SCENE: SceneDefinition = {
-  id: 'wilds',
-  name: 'Generated wilds',
-  generate: { seed: 1337, halfExtent: 30, hilliness: 1, density: 1.1 }
+  id: 'sector',
+  name: 'Generated sector',
+  voxel: { ...DEFAULT_VOXEL, seed: Math.floor(Math.random() * 1e9) }
 }
 
 /**

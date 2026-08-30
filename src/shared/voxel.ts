@@ -15,21 +15,34 @@ import { clamp, fbm, fbm3, ridged, smoothstep } from './noise.js'
 
 export const BLOCK = {
   air: 0,
-  stone: 1,
-  dirt: 2,
-  grass: 3,
-  sand: 4,
-  water: 5,
-  wood: 6,
-  leaf: 7,
-  plank: 8
+  /** Poured surface, the pale grey of a service yard. */
+  concrete: 1,
+  /** Wet road-black. What the low, flat ground is made of. */
+  asphalt: 2,
+  /** Broken-up spoil. The default landform under everything. */
+  rubble: 3,
+  /** Corroded steel, and what shows at the waterline. */
+  rust: 4,
+  /** Structural mass, deep down. */
+  slab: 5,
+  /** Standing runoff. Dark, still and not something to stand on. */
+  sludge: 6,
+  /** Cladding on anything built. */
+  panel: 7,
+  neonCyan: 8,
+  neonPink: 9
 } as const
 
 export type BlockId = (typeof BLOCK)[keyof typeof BLOCK]
 
-/** Water is drawn and waded through, not stood on. Everything else is solid. */
+/** Sludge is drawn and waded through, not stood on. Everything else is solid. */
 export function isSolid(block: BlockId): boolean {
-  return block !== BLOCK.air && block !== BLOCK.water
+  return block !== BLOCK.air && block !== BLOCK.sludge
+}
+
+/** Blocks that light themselves. In a world this dark they are the landmarks. */
+export function isEmissive(block: BlockId): boolean {
+  return block === BLOCK.neonCyan || block === BLOCK.neonPink
 }
 
 export interface VoxelSpec {
@@ -52,7 +65,7 @@ export interface VoxelSpec {
   relief: number
   /** Metres per noise cell for the broad landforms. */
   featureSize: number
-  /** Blocks below `groundLevel` that standing water fills to. */
+  /** Blocks below `groundLevel` that standing runoff fills to. */
   seaDepth: number
   /** Radius in metres held flat at the origin, so a spawn is never on a slope. */
   clearingRadius: number
@@ -66,13 +79,17 @@ export const DEFAULT_VOXEL: VoxelSpec = {
   blockSize: 0.5,
   height: 48,
   groundLevel: 24,
-  // Steep enough that ledges of two blocks occur, which is what makes a jump
-  // a real decision rather than scenery. Gentler than this and every rise is a
-  // single step the robot walks up without thinking.
-  relief: 16,
+  // Chosen by sweeping: enough relief for runoff to pool and for the ground to
+  // be worth crossing, without the flattened clearing becoming the floor of a
+  // quarry walled up on every side.
+  //
+  // Smooth noise, quantised, gives almost entirely single-block steps whatever
+  // these are set to — cliffs are not something this kind of terrain produces.
+  // Verticality worth jumping at has to be built, not grown.
+  relief: 15,
   featureSize: 11,
-  seaDepth: 3,
-  clearingRadius: 5,
+  seaDepth: 2,
+  clearingRadius: 7,
   caves: true
 }
 
@@ -197,19 +214,23 @@ export function generateVoxelWorld(spec: VoxelSpec): VoxelWorld {
         // Grass on top, a little dirt under it, stone all the way down. Sand
         // takes over near the waterline, which is what makes a shore read as a
         // shore rather than as grass that happens to stop.
+        // Asphalt on the flats, concrete where it rises, rust at the waterline
+        // where the runoff has been eating at it. Rubble under all of it, slab
+        // at depth.
         const depth = surface - by
         const shore = surface <= seaTop + 1
-        let block: BlockId = BLOCK.stone
-        if (depth === 0) block = shore ? BLOCK.sand : BLOCK.grass
-        else if (depth <= 2) block = shore ? BLOCK.sand : BLOCK.dirt
+        let block: BlockId = depth > 6 ? BLOCK.slab : BLOCK.rubble
+        if (depth === 0) {
+          block = shore ? BLOCK.rust : surface > groundLevel + 2 ? BLOCK.concrete : BLOCK.asphalt
+        } else if (depth <= 2) block = shore ? BLOCK.rust : BLOCK.rubble
 
         if (spec.caves && carved(spec, bx, by, bz, surface)) continue
         world.set(bx, by, bz, block)
       }
 
-      // Standing water fills whatever the land left below the line.
+      // Runoff fills whatever the land left below the line.
       for (let by = surface + 1; by <= seaTop && by < world.sizeY; by++) {
-        world.set(bx, by, bz, BLOCK.water)
+        world.set(bx, by, bz, BLOCK.sludge)
       }
     }
   }
