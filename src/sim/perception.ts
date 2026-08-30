@@ -5,18 +5,31 @@ import type { ObjectKind, WorldObject } from './objects.js'
 
 /** Sensor parameters. Profile fields, so they land in the config fingerprint. */
 export interface PerceptionConfig {
-  /** Metres. */
+  /**
+   * Metres. The sensor's hard limit, whatever the size of the thing — acuity
+   * does the real gating below it.
+   */
   range: number
   /** Degrees either side of the robot's heading. */
   halfAngleDeg: number
   /** Raycast to each candidate so hidden objects are genuinely hidden. */
   occlusion: boolean
+  /**
+   * How many metres away a 1-metre feature stays resolvable.
+   *
+   * Sight is angular: a thing is visible when it is big enough for how far away
+   * it is, which is why a lit beacon can be navigated by and a crate has to be
+   * walked into. 20 is chosen so a 0.4m crate resolves to exactly 8m — what the
+   * flat range used to be — so nothing close up changed when this arrived.
+   */
+  acuity: number
 }
 
 export const DEFAULT_PERCEPTION: PerceptionConfig = {
-  range: 8,
+  range: 45,
   halfAngleDeg: 60,
-  occlusion: true
+  occlusion: true,
+  acuity: 20
 }
 
 export interface Sighting {
@@ -54,6 +67,20 @@ export function footprintRadius(of: { halfX: number; halfZ: number }): number {
   return Math.max(of.halfX, of.halfZ)
 }
 
+/**
+ * What decides how conspicuous a thing is: its largest dimension, height
+ * included.
+ *
+ * Deliberately not `footprintRadius`, which is horizontal only. A beacon is
+ * [0.25, 3, 0.25] against a crate's [0.4, 0.4, 0.4] — narrower than the crate
+ * it exists to lead the robot to — so keyed off the footprint the landmark
+ * would resolve from closer than the cargo. What makes a beacon conspicuous is
+ * that it is tall.
+ */
+export function largestDimension(size: [number, number, number]): number {
+  return Math.max(size[0], size[1], size[2])
+}
+
 /** Roughly where a sensor would sit — used as the raycast origin. */
 const EYE_HEIGHT = 1.5
 
@@ -81,7 +108,11 @@ export function perceive(
     const dx = target.x - eye.x
     const dz = target.z - eye.z
     const distance = Math.hypot(dx, dz)
-    if (distance > config.range || distance < 1e-4) continue
+    if (distance < 1e-4) continue
+    // The sensor's own ceiling, then angular size. Both have to hold: acuity
+    // alone would resolve a 12m barrier at 240 metres.
+    if (distance > config.range) continue
+    if (distance > largestDimension(object.spec.size) * config.acuity) continue
 
     // Signed angle between where the robot is looking and the object. The head,
     // not the chest — the sensors are mounted in it.

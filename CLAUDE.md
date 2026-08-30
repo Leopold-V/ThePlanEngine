@@ -69,12 +69,12 @@ v0.3 scoring will hang off, so anything that changes what the model sees must go
 Settings hold *how to reach a model*; the profile holds *what the model is asked*. Do not add
 prompt- or capability-affecting fields to `Settings`.
 
-**Planned: hardware as a profile choice.** `perception` (range, field of view, occlusion) is the
-seed of a larger idea — that what the robot is *built from* should be a variable, not a constant.
-A head camera with a human-like cone is one loadout; a 360° lidar on the head is another, and a
-real one: Unitree ship the G1 and H1 with exactly that, while Figure and Optimus are deliberately
-camera-only. Extend `perception` into a sensor loadout when this lands rather than adding a
-parallel concept.
+**Planned: hardware as a profile choice.** `perception` (range, field of view, occlusion, acuity)
+is the seed of a larger idea — that what the robot is *built from* should be a variable, not a
+constant. A head camera with a human-like cone is one loadout; a 360° lidar on the head is another,
+and a real one: Unitree ship the G1 and H1 with exactly that, while Figure and Optimus are
+deliberately camera-only. Extend `perception` into a sensor loadout when this lands rather than
+adding a parallel concept.
 
 Its prerequisite — splitting detection from recognition — now exists as the `detections`
 observation mode, so a wide sensor no longer hands the model every object id in range. A loadout
@@ -175,12 +175,22 @@ what it is never told.
   in the pose already, and the shape of the ground three metres out is not something encoders know.
 - **Silence on level ground is the feature.** The observation is resent every turn, so a line that
   always appears is paid for on every call and stops being read. A step the robot could walk up is
-  not a reading.
+  not a reading — and neither is a 0.6m rise thirty metres out, because the bar scales with
+  distance (`notableAt`). The fan reaches most of the way across the sector, so a flat threshold
+  would find something on nearly every bearing and put a `Ground:` line on every single call.
 - **Readings are a distance and a height, and stop there.** Whether 1.4m is a wall or a staircase
   depends on limits stated in the system prompt, and drawing that conclusion is the model's job.
 
 Rules that are easy to break:
 
+- **Visibility is angular, and it keys off the object's *largest* dimension.** `acuity` is how many
+  metres a 1-metre feature stays resolvable for, so a 3m beacon can be navigated by from across the
+  sector while a 0.4m crate has to be walked into. Never gate it on `footprintRadius`: that is
+  horizontal only, and a beacon is [0.25, 3, 0.25] against a crate's [0.4, 0.4, 0.4] — keyed off
+  the footprint the landmark resolves from *closer* than the cargo it exists to lead the robot to.
+  `range` is the sensor's hard cap behind acuity, never the gate; on acuity alone a 12m barrier
+  would read at 240m. The default 20 is calibrated so a crate still resolves at exactly 8m, which
+  is what the flat range used to be — near-field behaviour did not change when this arrived.
 - **The sensors are in the head, not the chest.** `robot.sensorHeading` is body heading plus neck
   angle, and perception, `CameraView` and the first-person camera all use it. Never decide what
   can be seen from `robot.heading` — that was how it worked once, and the robot visibly turned its

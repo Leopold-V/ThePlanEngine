@@ -25,6 +25,11 @@ export interface PerceptionSettings {
   halfAngleDeg?: number
   /** Whether objects can hide behind other objects. */
   occlusion?: boolean
+  /**
+   * How many metres away a 1-metre feature stays resolvable, so what the robot
+   * can see scales with size rather than one flat distance.
+   */
+  acuity?: number
 }
 
 /**

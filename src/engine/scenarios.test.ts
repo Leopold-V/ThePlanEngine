@@ -170,3 +170,26 @@ it('fetch-across-the-sector: the cargo is far, on solid ground, and reachable', 
   expect(at.y - ground).toBeGreaterThan(0)
   expect(at.y - ground).toBeLessThan(0.45)
 })
+
+it('fetch-across-the-sector: the beacon can be found by looking, not by crossing the map', () => {
+  const { spec, physics, objects, robot, terrain } = build('fetch-across-the-sector')
+  const beacon = objects.find((o) => o.spec.id === 'beacon')
+  if (!beacon) throw new Error('the scenario has lost its beacon')
+
+  // Stand where the run starts, and turn to face the beacon. Nothing else: the
+  // point is that this is findable from the clearing rather than stumbled upon.
+  const bearing = Math.atan2(beacon.position.x - spec.start.x, beacon.position.z - spec.start.z)
+  robot.teleport(spec.start.x, spec.start.z, bearing, terrain.heightAt(spec.start.x, spec.start.z))
+  for (let i = 0; i < 120; i++) {
+    robot.update(STEP)
+    physics.step()
+  }
+
+  const seen = perceive(robot, objects, physics, RAPIER, DEFAULT_PERCEPTION).map((s) => s.id)
+
+  // The landmark reads from across the sector, and the cargo beside it does not.
+  // Both halves matter: the second is what makes this acuity rather than simply
+  // a longer range, and it is why the beacon is worth walking towards.
+  expect(seen).toContain('beacon')
+  expect(seen).not.toContain('amber_crate')
+})

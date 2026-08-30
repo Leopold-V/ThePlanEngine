@@ -179,8 +179,9 @@ export function RobotPanel({ profile, onChange, onReset, onClose }: Props): Reac
 
             <h3>Perception</h3>
             <p className="muted small">
-              The robot only sees what is in front of it. Narrowing this is a real experiment —
-              it changes the config fingerprint, so runs stay comparable.
+              The robot only sees what is in front of it, and only things large enough to resolve
+              at the distance they sit. Narrowing any of this is a real experiment — it changes the
+              config fingerprint, so runs stay comparable.
             </p>
 
             <div className="field-row">
@@ -189,7 +190,7 @@ export function RobotPanel({ profile, onChange, onReset, onClose }: Props): Reac
                 <input
                   type="number"
                   min={1}
-                  max={25}
+                  max={80}
                   step={0.5}
                   value={resolved.perception.range}
                   onChange={(e) =>
@@ -219,6 +220,29 @@ export function RobotPanel({ profile, onChange, onReset, onClose }: Props): Reac
                   }
                 />
                 <small>180 sees all around.</small>
+              </label>
+            </div>
+
+            <div className="field-row">
+              <label className="narrow">
+                Acuity (m per m)
+                <input
+                  type="number"
+                  min={1}
+                  max={100}
+                  step={1}
+                  value={resolved.perception.acuity}
+                  onChange={(e) =>
+                    onChange({
+                      ...profile,
+                      perception: { ...profile.perception, acuity: Number(e.target.value) || 1 }
+                    })
+                  }
+                />
+                <small>
+                  How far a 1m feature stays visible. Bigger things read from further: at 20, a
+                  0.4m crate resolves at 8m and a 3m beacon across the sector.
+                </small>
               </label>
             </div>
 

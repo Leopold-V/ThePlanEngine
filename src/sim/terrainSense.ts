@@ -37,6 +37,10 @@ export interface GroundReading {
  * Its step is 0.55m, so anything under this is ground it walks up without
  * noticing. Reporting those would put a line on every observation in rolling
  * terrain and bury the one that matters.
+ *
+ * This is the near-field floor. Further out the bar rises with distance — see
+ * `notableAt` — because the fan reaches most of the way across the sector and a
+ * flat 0.6m out there would find something on nearly every bearing.
  */
 const NOTABLE_RISE = 0.6
 /** Drops are only news when they are real; the ground dips constantly. */
@@ -71,7 +75,8 @@ export function senseGround(
 
     for (let d = SAMPLE_STEP; d <= config.range; d += SAMPLE_STEP) {
       const rise = groundHeightAt(from.x + dx * d, from.z + dz * d) - feet
-      if (rise >= NOTABLE_RISE || rise <= NOTABLE_DROP) {
+      const notable = notableAt(d, config.acuity)
+      if (rise >= notable || rise <= Math.min(NOTABLE_DROP, -notable)) {
         readings.push({ bearingDeg, distance: d, rise })
         break
       }
@@ -79,4 +84,17 @@ export function senseGround(
   }
 
   return readings
+}
+
+/**
+ * How much the ground has to move at `distance` before it is worth a clause.
+ *
+ * The same acuity that governs objects: a 0.6m step three metres away is news,
+ * the same 0.6m rise thirty metres away is not, and a five-metre hill out there
+ * still is. Without this, extending the fan across the sector would put a
+ * `Ground:` line on every single observation — and a line that always appears
+ * is paid for on every model call and stops being read.
+ */
+function notableAt(distance: number, acuity: number): number {
+  return Math.max(NOTABLE_RISE, distance / acuity)
 }

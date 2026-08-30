@@ -114,7 +114,8 @@ export function resolveProfile(
     perception: {
       range: profile.perception?.range ?? DEFAULT_PERCEPTION.range,
       halfAngleDeg: profile.perception?.halfAngleDeg ?? DEFAULT_PERCEPTION.halfAngleDeg,
-      occlusion: profile.perception?.occlusion ?? DEFAULT_PERCEPTION.occlusion
+      occlusion: profile.perception?.occlusion ?? DEFAULT_PERCEPTION.occlusion,
+      acuity: profile.perception?.acuity ?? DEFAULT_PERCEPTION.acuity
     },
     skills: resolved,
     tools: enabled.map((s) => ({
