@@ -209,7 +209,28 @@ nothing cosmetic can push the robot around or trip it.
 The camera takes a `CameraSubject` per frame and the HUD keys bubbles by owner, so pointing either
 at a second robot with a different model is an argument rather than a rewrite.
 
-## The world is generated, not enumerated
+## The world is a volume of blocks
+
+`shared/voxel.ts` holds it; `sim/VoxelTerrain.ts` meshes and collides it. The heightfield in
+`terrain.ts` is the legacy path, still used by nothing that ships.
+
+- **One ground height per column was the whole problem.** Caves, overhangs and interiors were not
+  hard on a heightfield, they were unrepresentable. Anything proposing "more world" on a
+  heightfield is proposing more objects on a bumpy sheet.
+- **Blocks are 0.5m because the robot is 1.6m, steps 0.55m and jumps 1.1m** — one block is a
+  stride, two is a jump. Change the block size and those become nonsense together.
+- **The mesh and the collider are built in one pass from the same faces**, so what the robot walks
+  into cannot drift from what is drawn. Verified by raycast at 0.0000m, which the heightfield
+  never managed.
+- **Mesh in two passes: count faces, then fill preallocated typed arrays.** Pushing onto plain
+  arrays cost over five seconds a world; the same geometry takes 829ms this way.
+- **Smooth noise quantised into blocks does not make cliffs.** Two-block ledges peaked at seven
+  across a whole map at every setting worth using. Verticality worth jumping at has to be built.
+- **Scenarios pin their seed; the sandbox rolls a fresh one.** A task whose world moves underneath
+  it cannot be compared between runs, and a sandbox that is the same every launch is not
+  procedural in any sense that matters.
+
+## The heightfield world (legacy)
 
 A scene document is either an object list or a `WorldGenSpec` — never both — and
 `resolveScene` in `shared/worldgen.ts` collapses the two before anything downstream sees them.

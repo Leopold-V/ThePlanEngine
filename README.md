@@ -237,7 +237,11 @@ v0.1 is the loop. The reason the project exists is what comes after it.
       to high ground, routing around a wall, and jumping onto a platform
 - [x] **v0.13** — a place rather than a heightfield: a sky to end in, groves of trees, water in
       the low ground, and a camera that can see the horizon
-- [ ] **v0.14** — recording and replay; deterministic reruns
+- [x] **v0.13.5** — the world becomes a volume of blocks instead of a sheet of heights, so caves
+      and overhangs are possible at all; the sandbox rerolls its seed, and the tasks move with it
+- [ ] **v0.14** — built structures: towers, gantries and neon, which is where the look and the
+      verticality both come from
+- [ ] **v0.15** — recording and replay; deterministic reruns
 - [ ] **later** — hardware as a configuration: the sensor loadout becomes a profile choice —
       head camera, 360° lidar, mounting and field of view — so what the robot is *built from* is
       a variable rather than a constant

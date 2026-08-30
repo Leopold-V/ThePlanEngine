@@ -30,14 +30,30 @@ const PALETTE: Record<BlockId, number> = {
   [BLOCK.neonPink]: 0xff3d9a
 }
 
-/** Face directions, with the neighbour they look at and their winding. */
-const FACES: { normal: [number, number, number]; corners: [number, number, number][] }[] = [
-  { normal: [0, 1, 0], corners: [[0, 1, 0], [0, 1, 1], [1, 1, 1], [1, 1, 0]] },
-  { normal: [0, -1, 0], corners: [[0, 0, 0], [1, 0, 0], [1, 0, 1], [0, 0, 1]] },
-  { normal: [1, 0, 0], corners: [[1, 0, 0], [1, 1, 0], [1, 1, 1], [1, 0, 1]] },
-  { normal: [-1, 0, 0], corners: [[0, 0, 0], [0, 0, 1], [0, 1, 1], [0, 1, 0]] },
-  { normal: [0, 0, 1], corners: [[0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]] },
-  { normal: [0, 0, -1], corners: [[0, 0, 0], [0, 1, 0], [1, 1, 0], [1, 0, 0]] }
+/**
+ * Face directions, flattened.
+ *
+ * Six faces, each six vertices, each three components — written out as plain
+ * numbers rather than nested arrays because this is read once per visible face
+ * and building a tuple there allocates millions of short-lived arrays.
+ */
+const FACE_NORMALS = [
+  [0, 1, 0],
+  [0, -1, 0],
+  [1, 0, 0],
+  [-1, 0, 0],
+  [0, 0, 1],
+  [0, 0, -1]
+] as const
+
+/** Two triangles per face, as 18 offsets in the block's unit cube. */
+const FACE_CORNERS: readonly (readonly number[])[] = [
+  [0, 1, 0, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0],
+  [0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 1],
+  [1, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 1],
+  [0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 1, 0],
+  [0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 1, 1],
+  [0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0]
 ]
 
 /**
@@ -50,23 +66,48 @@ function grainAt(bx: number, by: number, bz: number): number {
   return 0.9 + (n - Math.floor(n)) * 0.2
 }
 
-interface Buffers {
-  positions: number[]
-  normals: number[]
-  colors: number[]
-}
+/**
+ * Grows by writing into typed arrays rather than pushing onto plain ones.
+ *
+ * The first cut pushed every component onto a JS array — roughly seven million
+ * pushes for a full world, which took over five seconds. Counting faces first
+ * and filling exact buffers afterwards is the whole of the difference.
+ */
+class Buffers {
+  positions: Float32Array
+  normals: Float32Array
+  colors: Float32Array
+  count = 0
 
-function emptyBuffers(): Buffers {
-  return { positions: [], normals: [], colors: [] }
-}
+  constructor(faces: number) {
+    const values = faces * 6 * 3
+    this.positions = new Float32Array(values)
+    this.normals = new Float32Array(values)
+    this.colors = new Float32Array(values)
+  }
 
-function toGeometry(b: Buffers): THREE.BufferGeometry {
-  const geometry = new THREE.BufferGeometry()
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(b.positions, 3))
-  geometry.setAttribute('normal', new THREE.Float32BufferAttribute(b.normals, 3))
-  geometry.setAttribute('color', new THREE.Float32BufferAttribute(b.colors, 3))
-  geometry.computeBoundingSphere()
-  return geometry
+  push(x: number, y: number, z: number, nx: number, ny: number, nz: number, r: number, g: number, b: number): void {
+    const i = this.count * 3
+    this.positions[i] = x
+    this.positions[i + 1] = y
+    this.positions[i + 2] = z
+    this.normals[i] = nx
+    this.normals[i + 1] = ny
+    this.normals[i + 2] = nz
+    this.colors[i] = r
+    this.colors[i + 1] = g
+    this.colors[i + 2] = b
+    this.count++
+  }
+
+  toGeometry(): THREE.BufferGeometry {
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3))
+    geometry.setAttribute('normal', new THREE.BufferAttribute(this.normals, 3))
+    geometry.setAttribute('color', new THREE.BufferAttribute(this.colors, 3))
+    geometry.computeBoundingSphere()
+    return geometry
+  }
 }
 
 export class VoxelTerrain {
@@ -78,53 +119,53 @@ export class VoxelTerrain {
     rapier: typeof RAPIER,
     physics: RAPIER.World
   ) {
-    const solid = emptyBuffers()
-    const neon = emptyBuffers()
-    const fluid = emptyBuffers()
-    const shade = new THREE.Color()
+    // Two passes. The first only counts, so the second can write into buffers
+    // that are already exactly the right size.
+    let solidFaces = 0
+    let neonFaces = 0
+    let fluidFaces = 0
+    this.eachVisibleFace((block) => {
+      if (block === BLOCK.sludge) fluidFaces++
+      else if (isEmissive(block)) neonFaces++
+      else solidFaces++
+    })
 
+    const solid = new Buffers(solidFaces)
+    const neon = new Buffers(neonFaces)
+    const fluid = new Buffers(fluidFaces)
+    const shade = new THREE.Color()
     const size = world.spec.blockSize
 
-    for (let by = 0; by < world.sizeY; by++) {
-      for (let bz = 0; bz < world.sizeZ; bz++) {
-        for (let bx = 0; bx < world.sizeX; bx++) {
-          const block = world.get(bx, by, bz)
-          if (block === BLOCK.air) continue
+    this.eachVisibleFace((block, bx, by, bz, faceIndex) => {
+      const liquid = block === BLOCK.sludge
+      const into = liquid ? fluid : isEmissive(block) ? neon : solid
+      const tint = liquid ? 1 : grainAt(bx, by, bz)
+      shade.setHex(PALETTE[block] ?? 0xff00ff).multiplyScalar(tint)
 
-          const liquid = block === BLOCK.sludge
-          const target = liquid ? fluid : isEmissive(block) ? neon : solid
-          const [ox, oy, oz] = world.cornerOf(bx, by, bz)
-          const tint = liquid ? 1 : grainAt(bx, by, bz)
-          shade.setHex(PALETTE[block] ?? 0xff00ff).multiplyScalar(tint)
+      const ox = bx * size - world.spec.halfExtent
+      const oy = (by - world.spec.groundLevel - 1) * size
+      const oz = bz * size - world.spec.halfExtent
+      const normal = FACE_NORMALS[faceIndex] as readonly number[]
+      const corners = FACE_CORNERS[faceIndex] as readonly number[]
 
-          for (const face of FACES) {
-            const [nx, ny, nz] = face.normal
-            const neighbour = world.get(bx + nx, by + ny, bz + nz)
-            // A face is only worth drawing where it meets open space. Runoff
-            // shows only against air, or its own surface disappears; solids
-            // show against anything that is not solid, so a submerged wall is
-            // still there under the transparent water.
-            const hidden = liquid ? neighbour !== BLOCK.air : isSolid(neighbour)
-            if (hidden) continue
-
-            const [a, b2, c, d] = face.corners as [number, number, number][]
-            for (const corner of [a, b2, c, a, c, d]) {
-              target.positions.push(
-                ox + (corner[0] as number) * size,
-                oy + (corner[1] as number) * size,
-                oz + (corner[2] as number) * size
-              )
-              target.normals.push(nx, ny, nz)
-              target.colors.push(shade.r, shade.g, shade.b)
-            }
-          }
-        }
+      for (let v = 0; v < 18; v += 3) {
+        into.push(
+          ox + (corners[v] as number) * size,
+          oy + (corners[v + 1] as number) * size,
+          oz + (corners[v + 2] as number) * size,
+          normal[0] as number,
+          normal[1] as number,
+          normal[2] as number,
+          shade.r,
+          shade.g,
+          shade.b
+        )
       }
-    }
+    })
 
-    if (solid.positions.length > 0) {
+    if (solid.count > 0) {
       const mesh = new THREE.Mesh(
-        toGeometry(solid),
+        solid.toGeometry(),
         new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.82, metalness: 0.12 })
       )
       mesh.castShadow = true
@@ -132,20 +173,20 @@ export class VoxelTerrain {
       this.meshes.push(mesh)
     }
 
-    if (neon.positions.length > 0) {
+    if (neon.count > 0) {
       // Lit rather than shaded: in a world this dark the signage is the only
       // thing that reads at distance, and it has to survive the fog.
       this.meshes.push(
         new THREE.Mesh(
-          toGeometry(neon),
+          neon.toGeometry(),
           new THREE.MeshBasicMaterial({ vertexColors: true, fog: false, toneMapped: false })
         )
       )
     }
 
-    if (fluid.positions.length > 0) {
+    if (fluid.count > 0) {
       const mesh = new THREE.Mesh(
-        toGeometry(fluid),
+        fluid.toGeometry(),
         new THREE.MeshStandardMaterial({
           vertexColors: true,
           roughness: 0.08,
@@ -159,14 +200,50 @@ export class VoxelTerrain {
     }
 
     this.collider =
-      solid.positions.length > 0
+      solid.count > 0
         ? physics.createCollider(
             rapier.ColliderDesc.trimesh(
-              new Float32Array(solid.positions),
-              new Uint32Array(solid.positions.length / 3).map((_, i) => i)
+              solid.positions,
+              new Uint32Array(solid.count).map((_, i) => i)
             )
           )
         : null
+  }
+
+  /**
+   * Visits every face where a block meets open space.
+   *
+   * Shared by the counting pass and the filling pass so the two cannot
+   * disagree about which faces exist — the classic way a two-pass mesher goes
+   * wrong is for one pass to see a face the other does not.
+   */
+  private eachVisibleFace(
+    visit: (block: BlockId, bx: number, by: number, bz: number, faceIndex: number) => void
+  ): void {
+    const { world } = this
+    for (let by = 0; by < world.sizeY; by++) {
+      for (let bz = 0; bz < world.sizeZ; bz++) {
+        for (let bx = 0; bx < world.sizeX; bx++) {
+          const block = world.get(bx, by, bz)
+          if (block === BLOCK.air) continue
+          const liquid = block === BLOCK.sludge
+
+          for (let f = 0; f < 6; f++) {
+            const normal = FACE_NORMALS[f] as readonly number[]
+            const neighbour = world.get(
+              bx + (normal[0] as number),
+              by + (normal[1] as number),
+              bz + (normal[2] as number)
+            )
+            // Runoff shows only against air, or its own surface disappears.
+            // Solids show against anything not solid, so a submerged wall is
+            // still there beneath the transparent water.
+            if (liquid ? neighbour !== BLOCK.air : isSolid(neighbour)) continue
+            visit(block, bx, by, bz, f)
+          }
+        }
+      }
+    }
   }
 
   /** Exact, because a column scan finds the true top face of a block. */

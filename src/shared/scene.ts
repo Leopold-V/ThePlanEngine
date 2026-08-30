@@ -133,3 +133,97 @@ export const FLAT_SCENE: SceneDefinition = {
 }
 
 export { block as blockSpec, table as tableSpec }
+
+// ---------------------------------------------------------------------------
+// The sector: props for scenarios set in the voxel world
+// ---------------------------------------------------------------------------
+
+/**
+ * A flat plain of blocks — the voxel equivalent of the old empty plane.
+ *
+ * Scenarios that test planning rather than navigation want ground that does
+ * not interfere. Zero relief gives exactly that, and keeps every scene on one
+ * representation instead of two.
+ */
+export const FLAT_VOXEL: VoxelSpec = {
+  ...DEFAULT_VOXEL,
+  seed: 1,
+  relief: 0,
+  seaDepth: 0,
+  caves: false,
+  clearingRadius: 0
+}
+
+/** Colour-coded so a task can name one crate among several. */
+export const CRATE_COLORS = { amber: 0xd08a2e, cyan: 0x2fb6c0, magenta: 0xc0417f } as const
+
+/** Cargo, and the only thing in the sector worth carrying. */
+export const crateSpec = (
+  id: string,
+  color: number,
+  at: [number, number]
+): ObjectSpec => ({
+  id,
+  kind: 'block',
+  color,
+  size: [0.4, 0.4, 0.4],
+  position: [at[0], 0.2, at[1]],
+  graspable: true,
+  mass: 1
+})
+
+/** A loading platform. Waist height, so a crate has to be lifted onto it. */
+export const platformSpec = (id: string, at: [number, number]): ObjectSpec => ({
+  id,
+  kind: 'table',
+  color: 0x5a6472,
+  size: [1.6, 0.75, 1.0],
+  position: [at[0], 0.375, at[1]],
+  graspable: false,
+  mass: 40,
+  fixed: true
+})
+
+/** Emissive marker. Tall and lit, so it reads through the haze at distance. */
+export const beaconSpec = (id: string, at: [number, number], height = 2.2): ObjectSpec => ({
+  id,
+  kind: 'marker',
+  color: 0x2ff0e0,
+  size: [0.25, height, 0.25],
+  position: [at[0], height / 2, at[1]],
+  graspable: false,
+  mass: 5,
+  fixed: true
+})
+
+/** A run of barrier. Taller than the robot, so it is routed around, not over. */
+export const barrierSpec = (
+  id: string,
+  at: [number, number],
+  size: [number, number, number]
+): ObjectSpec => ({
+  id,
+  kind: 'wall',
+  color: 0x6c7480,
+  size,
+  position: [at[0], size[1] / 2, at[1]],
+  graspable: false,
+  mass: 400,
+  fixed: true
+})
+
+/** A block of structure to climb onto. Vertical sides: no way up but a jump. */
+export const gantrySpec = (
+  id: string,
+  at: [number, number],
+  height = 0.9
+): ObjectSpec => ({
+  id,
+  kind: 'wall',
+  color: 0x7d848c,
+  size: [2.6, height, 2.6],
+  position: [at[0], height / 2, at[1]],
+  graspable: false,
+  mass: 800,
+  fixed: true
+})

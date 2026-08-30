@@ -218,7 +218,9 @@ export function generateVoxelWorld(spec: VoxelSpec): VoxelWorld {
         // where the runoff has been eating at it. Rubble under all of it, slab
         // at depth.
         const depth = surface - by
-        const shore = surface <= seaTop + 1
+        // No runoff means no waterline, or a flat yard reads as one long
+        // beach of corroded metal.
+        const shore = spec.seaDepth > 0 && surface <= seaTop + 1
         let block: BlockId = depth > 6 ? BLOCK.slab : BLOCK.rubble
         if (depth === 0) {
           block = shore ? BLOCK.rust : surface > groundLevel + 2 ? BLOCK.concrete : BLOCK.asphalt
