@@ -8,7 +8,8 @@ const LABELS: Record<EngineEvent['kind'], string> = {
   result: 'Result',
   observation: 'Senses',
   error: 'Error',
-  system: 'Sim'
+  system: 'Sim',
+  metrics: 'Cost'
 }
 
 export function Transcript({ events }: { events: EngineEvent[] }): React.JSX.Element {

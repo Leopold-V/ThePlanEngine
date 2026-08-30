@@ -188,6 +188,13 @@ body {
   color: var(--muted);
   font-size: 0.76rem;
 }
+.event.metrics {
+  color: var(--muted);
+  font-size: 0.72rem;
+  /* Monospaced so the numbers line up down the column and a trend is readable. */
+  font-family: ui-monospace, 'Cascadia Code', monospace;
+  opacity: 0.75;
+}
 .event.observation {
   border-left-color: #7d8ba6;
   color: var(--muted);

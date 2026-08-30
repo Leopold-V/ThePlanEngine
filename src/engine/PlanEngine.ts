@@ -14,6 +14,7 @@ export type EventKind =
   | 'observation'
   | 'error'
   | 'system'
+  | 'metrics'
 
 export interface EngineEvent {
   id: string
@@ -113,12 +114,17 @@ export class PlanEngine {
         }
 
         steps++
-        const reply = await this.options.send({
+        const request: SendRequest = {
           providerId,
           system: resolved.systemPrompt,
           messages: withRecentImagesOnly(this.messages),
           tools
-        })
+        }
+        const startedAt = performance.now()
+        const reply = await this.options.send(request)
+        // Before the error check: a call that took two minutes and then failed
+        // is exactly the one worth having a number for.
+        this.emitMetrics(steps, performance.now() - startedAt, request, reply)
 
         if (reply.stopReason === 'error') {
           failure = reply.error ?? 'The model provider failed.'
@@ -323,6 +329,22 @@ export class PlanEngine {
       parts: [{ type: 'text', text: `${quoteOperator(said)}\n\n[${observation}]` }]
     })
     this.emit('observation', observation)
+  }
+
+  /**
+   * One line per round trip: how long the model took, and what it was sent.
+   *
+   * History is resent in full every turn and is never trimmed, so the cost of a
+   * turn is a function of every turn before it. Without this the growth is
+   * invisible — you feel it as "the robot got slower" with nothing to point at.
+   */
+  private emitMetrics(step: number, ms: number, request: SendRequest, reply: ModelReply): void {
+    const cost = reply.usage
+      ? `${reply.usage.inputTokens} in / ${reply.usage.outputTokens} out`
+      : // Not every provider reports usage. Fall back to the size of the payload,
+        // which is the number this exists to watch grow.
+        `${JSON.stringify(request.messages).length} chars sent`
+    this.emit('metrics', `turn ${step} · ${(ms / 1000).toFixed(1)}s · ${cost}`)
   }
 
   private emit(kind: EventKind, text: string, ok?: boolean): void {
