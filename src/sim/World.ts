@@ -301,7 +301,7 @@ export class World {
   snapshot(): WorldSnapshot {
     const p = this.robot.position
     return {
-      robot: { x: p.x, z: p.z, holding: this.robot.held?.spec.id ?? null },
+      robot: { x: p.x, y: p.y, z: p.z, holding: this.robot.held?.spec.id ?? null },
       objects: this.objects.map((o) => {
         const pos = o.position
         return {

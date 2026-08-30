@@ -14,6 +14,14 @@ export type Criterion =
   | { type: 'robot_near'; x: number; z: number; within: number }
   | { type: 'holding'; object: string | null }
   | { type: 'object_upright'; object: string }
+  /**
+   * The robot's feet end at least this high.
+   *
+   * Deliberately about height rather than about standing on a named thing: the
+   * ground a generated world asks you to climb is terrain, and terrain has no
+   * id to refer to.
+   */
+  | { type: 'robot_above'; height: number }
 
 /**
  * Plain world state for scoring. Lives here rather than beside the evaluator so
@@ -21,7 +29,13 @@ export type Criterion =
  * no three.js, Rapier, or renderer in sight.
  */
 export interface WorldSnapshot {
-  robot: { x: number; z: number; holding: string | null }
+  robot: {
+    x: number
+    z: number
+    /** Height of the feet above the world's base plane. */
+    y: number
+    holding: string | null
+  }
   objects: ObjectSnapshot[]
 }
 
@@ -145,6 +159,89 @@ export const BUILT_IN_SCENARIOS: Scenario[] = [
       { type: 'object_upright', object: 'marker_post' },
       { type: 'holding', object: null }
     ]
+  },
+  {
+    // Terrain, rather than an object, is the thing to be climbed — which is why
+    // this needs a criterion about height and could not be expressed before.
+    //
+    // Seed 21 peaks at 1.71m with under 2% of the map above 1.5m, so the high
+    // ground has to be found rather than stumbled onto. A flood fill confirms
+    // 1.73m is reachable from the clearing, and reachable by walking as well as
+    // by jumping: there is a way up for a model that looks for one and a
+    // shortcut for a model that would rather jump.
+    id: 'reach-high-ground',
+    name: 'Reach the high ground',
+    goal:
+      'Get yourself up onto the high ground — at least 1.3 metres above where you are standing ' +
+      'now. The landscape rises and falls; some slopes can be walked up and some ledges have to ' +
+      'be jumped.',
+    scene: {
+      id: 'wilds-high',
+      name: 'Generated wilds',
+      generate: { seed: 21, halfExtent: 24, hilliness: 1, density: 0.8 }
+    },
+    start: { x: 0, z: 0, headingDeg: 0 },
+    criteria: [{ type: 'robot_above', height: 1.3 }]
+  },
+  {
+    // A solid twelve-metre wall with the crate directly behind it. Walking at
+    // the crate is refused by steering, so the only way through is to route:
+    // pick a waypoint past one end, then come back. That is the replanning loop
+    // the app exists to exercise, and it is unsolvable without the wall's
+    // footprint appearing in the observation.
+    id: 'behind-the-wall',
+    name: 'Behind the wall',
+    goal:
+      'There is a crate on the far side of the wall. Fetch it and bring it back to where you ' +
+      'are standing now, then put it down.',
+    scene: {
+      id: 'walled-off',
+      name: 'A wall, and a crate behind it',
+      objects: [
+        {
+          id: 'wall_1',
+          kind: 'wall',
+          color: 0x9a8f7d,
+          size: [12, 2.2, 0.6],
+          position: [0, 1.1, 5],
+          graspable: false,
+          mass: 400,
+          fixed: true
+        },
+        blockSpec('crate_1', BLOCK_COLORS.red, [0, 0.15, 9])
+      ]
+    },
+    start: { x: 0, z: 0, headingDeg: 0 },
+    criteria: [
+      { type: 'object_near', object: 'crate_1', x: 0, z: 0, within: 3 },
+      { type: 'holding', object: null }
+    ]
+  },
+  {
+    // The one place a jump is genuinely the only way. A block has vertical
+    // sides, so unlike terrain there is no walkable approach to find — the
+    // model either jumps or fails.
+    id: 'up-on-the-block',
+    name: 'Up on the block',
+    goal: 'Climb up onto the stone platform and stay standing on top of it.',
+    scene: {
+      id: 'one-platform',
+      name: 'A platform to jump onto',
+      objects: [
+        {
+          id: 'platform',
+          kind: 'wall',
+          color: 0x9a8f7d,
+          size: [2.6, 0.9, 2.6],
+          position: [0, 0.45, 5],
+          graspable: false,
+          mass: 800,
+          fixed: true
+        }
+      ]
+    },
+    start: { x: 0, z: 0, headingDeg: 0 },
+    criteria: [{ type: 'robot_above', height: 0.75 }]
   },
   {
     // The first scenario set in a generated world. The scene is four numbers

@@ -294,6 +294,11 @@ it and it is the best-tested code in the project.
 - **Criteria are checked against world state**, never against what the model claimed it did.
 - Adding a predicate means extending the `Criterion` union, `evaluateOne`, `describeCriterion` in
   the panel, and its tests. Keep the vocabulary small.
+- **`robot_above` is about height, not about standing on a named thing.** What a generated world
+  asks the robot to climb is terrain, and terrain has no id to refer to.
+- **A scenario has to be checked solvable before it ships.** `reach-high-ground` was flood-filled
+  from the clearing to confirm the summit is reachable; the platform and wall scenarios are
+  pinned by `scenarios.test.ts`. A task nobody can complete is not a hard task, it is a broken one.
 - Run records store the **config fingerprint**, so results stay attributable to a configuration.
   Anything that changes what the model sees must go through `resolveProfile` or the fingerprint
   lies.

@@ -37,6 +37,8 @@ function evaluateOne(criterion: Criterion, world: WorldSnapshot): CriterionResul
       return holding(criterion.object, world)
     case 'object_upright':
       return upright(criterion.object, world)
+    case 'robot_above':
+      return robotAbove(criterion.height, world)
   }
 }
 
@@ -138,6 +140,19 @@ function upright(objectId: string, world: WorldSnapshot): CriterionResult {
     label,
     passed: object.up.y >= UPRIGHT_DOT,
     detail: `${objectId} is tilted ${tiltDegrees.toFixed(0)}° from vertical.`
+  }
+}
+
+function robotAbove(height: number, world: WorldSnapshot): CriterionResult {
+  const label = `robot is at least ${height}m up`
+  const actual = world.robot.y
+  return {
+    label,
+    passed: actual >= height,
+    detail:
+      actual >= height
+        ? `Robot is standing ${fmt(actual)}m up.`
+        : `Robot is only ${fmt(actual)}m up, ${fmt(height - actual)}m short.`
   }
 }
 

@@ -95,11 +95,19 @@ function describeSighting(s: Sighting, belief?: { label: string; identified: boo
       ? `, ${Math.abs(s.elevation).toFixed(1)}m ${s.elevation > 0 ? 'above' : 'below'} you`
       : ''
   const name = belief?.label ?? s.id
-  const unknown =
-    belief && !belief.identified ? ` (${size(footprintRadius(s))} across, not identified)` : ''
+  const anonymous = Boolean(belief && !belief.identified)
+  const unknown = anonymous ? ` (${size(footprintRadius(s))} across, not identified)` : ''
+  // Big things get their footprint, because you cannot plan a way round a wall
+  // without knowing how long it is. Small ones do not, since the extent of a
+  // crate tells the planner nothing it needs and the observation is resent
+  // every turn.
+  const extent =
+    !anonymous && footprintRadius(s) >= 0.75
+      ? `, ${(s.halfX * 2).toFixed(1)}m by ${(s.halfZ * 2).toFixed(1)}m`
+      : ''
   return (
     `${name}${unknown} at (${round(s.position.x)}, ${round(s.position.z)}) — ` +
-    `${s.distance.toFixed(1)}m ${bearingWords(s.bearingDeg)}${height}`
+    `${s.distance.toFixed(1)}m ${bearingWords(s.bearingDeg)}${extent}${height}`
   )
 }
 

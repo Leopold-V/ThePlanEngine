@@ -209,5 +209,7 @@ function describeCriterion(criterion: Scenario['criteria'][number]): string {
         : `robot ends holding ${criterion.object}`
     case 'object_upright':
       return `${criterion.object} is still upright`
+    case 'robot_above':
+      return `robot ends at least ${criterion.height}m up`
   }
 }

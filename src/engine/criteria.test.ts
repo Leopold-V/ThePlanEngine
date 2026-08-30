@@ -15,7 +15,7 @@ const table = { id: 'table', x: 5, y: 0.375, z: 1, size: [1.6, 0.75, 1.0] as con
 
 function world(overrides: Partial<WorldSnapshot> = {}): WorldSnapshot {
   return {
-    robot: { x: 0, z: 0, holding: null },
+    robot: { x: 0, y: 0, z: 0, holding: null },
     objects: [{ ...table, size: [...table.size] as [number, number, number] }],
     ...overrides
   }
@@ -67,14 +67,14 @@ describe('holding', () => {
   })
 
   it('fails for empty hands when the robot is still carrying something', () => {
-    const w = world({ robot: { x: 0, z: 0, holding: 'red_block' } })
+    const w = world({ robot: { x: 0, y: 0, z: 0, holding: 'red_block' } })
     const result = evaluate([{ type: 'holding', object: null }], w)[0]
     expect(result?.passed).toBe(false)
     expect(result?.detail).toContain('holding red_block')
   })
 
   it('passes when carrying the named object', () => {
-    const w = world({ robot: { x: 0, z: 0, holding: 'red_block' } })
+    const w = world({ robot: { x: 0, y: 0, z: 0, holding: 'red_block' } })
     expect(evaluate([{ type: 'holding', object: 'red_block' }], w)[0]?.passed).toBe(true)
   })
 })
@@ -110,7 +110,7 @@ describe('distance predicates', () => {
   })
 
   it('robot_near measures from the robot', () => {
-    const w = world({ robot: { x: 3, z: 4, holding: null } })
+    const w = world({ robot: { x: 3, y: 0, z: 4, holding: null } })
     const criterion = { type: 'robot_near', x: 0, z: 0, within: 5 } as const
     const result = evaluate([criterion], w)[0]
     expect(result?.passed).toBe(true)
@@ -130,5 +130,26 @@ describe('allPassed', () => {
     ]
     expect(allPassed(results)).toBe(false)
     expect(allPassed([results[0] as never])).toBe(true)
+  })
+})
+
+describe('robot_above', () => {
+  it('passes when the robot is standing high enough', () => {
+    const w = world({ robot: { x: 0, y: 1.42, z: 0, holding: null } })
+    const [result] = evaluate([{ type: 'robot_above', height: 1.3 }], w)
+    expect(result?.passed).toBe(true)
+    expect(result?.detail).toContain('1.42')
+  })
+
+  it('fails on the ground, and says how far short', () => {
+    const w = world({ robot: { x: 0, y: 0.2, z: 0, holding: null } })
+    const [result] = evaluate([{ type: 'robot_above', height: 1.3 }], w)
+    expect(result?.passed).toBe(false)
+    expect(result?.detail).toContain('1.10m short')
+  })
+
+  it('treats the threshold as inclusive', () => {
+    const w = world({ robot: { x: 0, y: 0.75, z: 0, holding: null } })
+    expect(evaluate([{ type: 'robot_above', height: 0.75 }], w)[0]?.passed).toBe(true)
   })
 })

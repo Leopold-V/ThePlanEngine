@@ -233,7 +233,9 @@ v0.1 is the loop. The reason the project exists is what comes after it.
       terrain with a real skyline, rocks that look like rocks, and props in clusters
 - [x] **v0.11** — ruins and ramps: walls that have to be routed around rather than dodged, and
       corridors cut through the terraces so a plateau can be walked up as well as jumped onto
-- [ ] **v0.12** — recording and replay; deterministic reruns
+- [x] **v0.12** — tasks that use the world: a criterion for height, and scenarios for climbing
+      to high ground, routing around a wall, and jumping onto a platform
+- [ ] **v0.13** — recording and replay; deterministic reruns
 - [ ] **later** — hardware as a configuration: the sensor loadout becomes a profile choice —
       head camera, 360° lidar, mounting and field of view — so what the robot is *built from* is
       a variable rather than a constant
