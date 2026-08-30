@@ -33,7 +33,7 @@ export const pickUp: Skill<z.infer<typeof schema>> = {
       const known = knownLabels(world)
       return known.length > 0
         ? `No object called "${id}". Known so far: ${known.join(', ')}.`
-        : `No object called "${id}", and nothing has been seen yet. Try scan first.`
+        : `No object called "${id}", and nothing has been seen yet.`
     }
 
     if (!object.spec.graspable) return `${id} is too heavy to pick up.`
@@ -41,8 +41,7 @@ export const pickUp: Skill<z.infer<typeof schema>> = {
     const distance = robot.distanceTo(object.position.x, object.position.z)
     if (distance > Robot.REACH) {
       return (
-        `Cannot reach ${id}: it is ${distance.toFixed(2)}m away and reach is ` +
-        `${Robot.REACH}m. Walk closer first.`
+        `Cannot reach ${id}: it is ${distance.toFixed(2)}m away and reach is ${Robot.REACH}m.`
       )
     }
 

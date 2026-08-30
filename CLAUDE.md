@@ -105,6 +105,28 @@ it generates the JSON Schema sent to the model *and* validates the arguments tha
 - **`observe.describe()` is resent every turn**, so keep it to one short line. Verbosity there is
   paid for on every model call.
 
+### What the engine may say, and what it must not
+
+The line that keeps this a test of the model rather than a test of our prompting:
+
+- **Observations report state and what the body detected.** `the ground just ahead rises 1.40m`
+  is a sensor reading; `too steep to walk up` is the controller knowing its own slope limit. Both
+  are fair.
+- **They must never name the remedy.** `Jumping may clear it`, `Try going round it`,
+  `Walk closer first`, `Try scan first` — all of these were in the engine, and all of them do the
+  model's planning for it. A model that jumps because we told it to has demonstrated nothing, and
+  the difference between two models disappears into our wording.
+- **Precondition refusals state the precondition and the numbers**, and stop there:
+  `it is 3.20m away and reach is 1.5m`, not `walk closer first`. The tool explains its own
+  contract; it does not sequence the next call.
+- **Skill descriptions are the tool contract** and may say how the tool works and when it applies.
+  That is where "how" legitimately lives, because the model reads it before choosing.
+
+**Coaching belongs in the system prompt, not in the engine.** The prompt is profile-editable,
+visible in the Preview tab and part of the config fingerprint — so a hint there is a variable you
+can switch on and compare runs against. The same hint welded into an observation is invisible,
+constant, and silently flatters every model equally.
+
 ## Conventions
 
 - TypeScript strict. No `any` outside the deliberately-loose `SKILLS` array.

@@ -90,8 +90,7 @@ export const walkTo: Skill<z.infer<typeof schema>> = {
           ok: false,
           observation:
             `Blocked ${remaining}m short of the target — the ground just ahead rises ` +
-            `${cause.rise.toFixed(2)}m within a stride, too steep to walk up. ` +
-            `${at}. Jumping may clear it, or look for a gentler way round.`
+            `${cause.rise.toFixed(2)}m within a stride, too steep to walk up. ${at}.`
         }
       }
 
@@ -100,7 +99,7 @@ export const walkTo: Skill<z.infer<typeof schema>> = {
         ok: false,
         observation:
           `Blocked ${remaining}m short of the target — stopped making progress. ` +
-          `${culprit ? `${culprit}. ` : ''}${at}. Try going round it.`
+          `${culprit ? `${culprit}. ` : ''}${at}.`
       }
     }
 

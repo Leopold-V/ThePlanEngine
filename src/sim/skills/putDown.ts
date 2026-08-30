@@ -23,7 +23,7 @@ export const putDown: Skill<z.infer<typeof schema>> = {
     if (distance > Robot.REACH) {
       return (
         `Cannot place at (${x}, ${z}): that is ${distance.toFixed(2)}m away and reach is ` +
-        `${Robot.REACH}m. Walk closer first.`
+        `${Robot.REACH}m.`
       )
     }
 

@@ -38,7 +38,7 @@ export const approach: Skill<z.infer<typeof schema>> = {
     const known = knownLabels(world)
     return known.length > 0
       ? `Never seen "${id}". Known so far: ${known.join(', ')}.`
-      : `Never seen "${id}", and nothing has been seen yet. Look around first.`
+      : `Never seen "${id}", and nothing has been seen yet.`
   },
 
   async run(robot, { object: id }, ctx): Promise<SkillResult> {
@@ -86,8 +86,7 @@ export const approach: Skill<z.infer<typeof schema>> = {
         ok: false,
         observation:
           `Stopped making progress toward ${id}, still ${distance.toFixed(2)}m from it. ` +
-          `${culprit ? `${culprit}. ` : 'Nothing is visible ahead, so it may be a steep slope. '}` +
-          'Try going round it.'
+          `${culprit ? `${culprit}.` : 'Nothing is visible ahead.'}`
       }
     }
 
@@ -103,8 +102,7 @@ export const approach: Skill<z.infer<typeof schema>> = {
       observation:
         distance <= Robot.REACH
           ? `Standing ${distance.toFixed(2)}m from ${id}, within reach.`
-          : `Arrived where ${id} was last seen, but it is now ${distance.toFixed(2)}m away. ` +
-            'It may have moved — look again.'
+          : `Arrived where ${id} was last seen, but it is now ${distance.toFixed(2)}m away.`
     }
   }
 }

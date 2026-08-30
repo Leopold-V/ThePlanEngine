@@ -25,7 +25,7 @@ export const face: Skill<z.infer<typeof schema>> = {
     const known = knownLabels(world)
     return known.length > 0
       ? `Never seen "${id}". Known so far: ${known.join(', ')}.`
-      : `Never seen "${id}", and nothing has been seen yet. Look around first.`
+      : `Never seen "${id}", and nothing has been seen yet.`
   },
 
   async run(robot, { object: id }, ctx): Promise<SkillResult> {

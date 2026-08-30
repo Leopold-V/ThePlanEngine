@@ -98,17 +98,19 @@ it('a wall of ground is reported as ground, with the height to judge a jump by',
 
   console.log(result.observation)
   expect(result.ok).toBe(false)
-  // The old message said "try going round it", which is the wrong advice here.
+  // Terrain is named as the blocker, not a nearby object and not "no progress".
   expect(result.observation).toContain('too steep to walk up')
-  expect(result.observation).toContain('Jumping may clear it')
   // And it must say how high, or the model cannot tell 1.4m from 0.4m.
   expect(result.observation).toMatch(/rises \d\.\d\dm/)
+  // But it must not name the remedy: choosing to jump is the model's job.
+  expect(result.observation).not.toMatch(/jump/i)
 })
 
-it('says nothing about jumping when the ground is walkable', async () => {
+it('says nothing about the ground when it is walkable', async () => {
   const w = ledgeWorld(0.15)
   const result = await drive(walkTo.run(w.robot, { x: 0, z: 8 }, w.ctx), w)
 
   console.log(result.observation)
-  expect(result.observation).not.toContain('Jumping may clear it')
+  expect(result.ok).toBe(true)
+  expect(result.observation).not.toContain('too steep')
 })
