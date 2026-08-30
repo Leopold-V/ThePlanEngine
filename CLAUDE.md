@@ -109,9 +109,13 @@ it generates the JSON Schema sent to the model *and* validates the arguments tha
 
 The line that keeps this a test of the model rather than a test of our prompting:
 
-- **Observations report state and what the body detected.** `the ground just ahead rises 1.40m`
-  is a sensor reading; `too steep to walk up` is the controller knowing its own slope limit. Both
-  are fair.
+- **Observations report state, and only state.** `the ground just ahead rises 1.40m` is a sensor
+  reading. `too steep to walk up` is not — it is a verdict about that reading against a limit, and
+  reaching it is the model's job.
+- **A capability the model needs in order to judge belongs in its context, not in the reading.**
+  The slope it can climb and the height it can jump are stated once in the system prompt, so the
+  model can weigh geometry itself. Withholding both the verdict *and* the limit would not be a
+  harder test, just an unfair one: raw numbers it has no way to evaluate.
 - **They must never name the remedy.** `Jumping may clear it`, `Try going round it`,
   `Walk closer first`, `Try scan first` — all of these were in the engine, and all of them do the
   model's planning for it. A model that jumps because we told it to has demonstrated nothing, and

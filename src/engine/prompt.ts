@@ -35,6 +35,9 @@ YOUR BODY
 - You can carry one object at a time.
 - Picking up and putting down only work within about a metre and a half, and they do not walk you
   there. Walk to the object first, then pick it up.
+- You can walk up a slope of roughly 45 degrees — a rise of about one metre for every metre
+  forward. Anything steeper than that you cannot climb on foot.
+- You can jump about 1.1 metres straight up, less if you also travel forward.
 - After each action you receive an observation with your real position. Trust it over your own
   estimate — if an action fell short, the observation is the ground truth.
 

@@ -98,11 +98,10 @@ it('a wall of ground is reported as ground, with the height to judge a jump by',
 
   console.log(result.observation)
   expect(result.ok).toBe(false)
-  // Terrain is named as the blocker, not a nearby object and not "no progress".
-  expect(result.observation).toContain('too steep to walk up')
-  // And it must say how high, or the model cannot tell 1.4m from 0.4m.
-  expect(result.observation).toMatch(/rises \d\.\d\dm/)
-  // But it must not name the remedy: choosing to jump is the model's job.
+  // The geometry, so the model can weigh it against limits it has been told.
+  expect(result.observation).toMatch(/the ground just ahead rises \d\.\d\dm/)
+  // Not the verdict, and not the remedy — both are the model's to reach.
+  expect(result.observation).not.toMatch(/steep/i)
   expect(result.observation).not.toMatch(/jump/i)
 })
 
@@ -112,5 +111,5 @@ it('says nothing about the ground when it is walkable', async () => {
 
   console.log(result.observation)
   expect(result.ok).toBe(true)
-  expect(result.observation).not.toContain('too steep')
+  expect(result.observation).not.toContain('the ground just ahead rises')
 })

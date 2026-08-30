@@ -82,15 +82,16 @@ export const walkTo: Skill<z.infer<typeof schema>> = {
 
     const remaining = robot.distanceTo(x, z).toFixed(2)
     if (blocked) {
-      // What stopped it decides what it should try. Telling a robot sitting in
-      // a hollow to go round is worse than useless — the way out is up, and it
-      // needs the height to judge that against what it can jump.
+      // Terrain or a thing: the robot knows which, because its own body is what
+      // failed. But it reports the rise and stops there — how steep is too steep
+      // is a fact about the robot, stated once in its context, and comparing the
+      // two is the model's to do.
       if (cause.by === 'ground') {
         return {
           ok: false,
           observation:
             `Blocked ${remaining}m short of the target — the ground just ahead rises ` +
-            `${cause.rise.toFixed(2)}m within a stride, too steep to walk up. ${at}.`
+            `${cause.rise.toFixed(2)}m within a stride. ${at}.`
         }
       }
 
