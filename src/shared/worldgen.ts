@@ -46,6 +46,8 @@ export function terrainSpecFor(spec: WorldGenSpec): TerrainSpec {
     amplitude: spec.hilliness * 3.4,
     featureSize: 14,
     clearingRadius: 5,
+    // Just under the valley floors, so only the deepest basins fill.
+    waterLevel: -spec.hilliness * 1.05,
     // Just under the robot's 1.1m ceiling, so a ledge is always clearable by a
     // deliberate jump and never by walking.
     terraceStep: 0.85
@@ -73,6 +75,8 @@ const CRATE_COLORS = [0xb5763f, 0xa8683a, 0xc08a4d]
 const BOULDER_COLORS = [0x7a8090, 0x8b8f9c, 0x6d7382]
 /** Warmer and lighter than rock, so built things read as built. */
 const STONE_COLORS = [0x9a8f7d, 0x8b8171, 0xa89b86]
+/** Deep, desaturated greens — foliage should not out-shout the landmarks. */
+const FOLIAGE_COLORS = [0x3f5c46, 0x47654d, 0x374f3f, 0x506b4f]
 
 function generate(spec: WorldGenSpec): ResolvedScene {
   const terrain = terrainSpecFor(spec)
@@ -132,6 +136,8 @@ function generate(spec: WorldGenSpec): ResolvedScene {
       if (Math.abs(x) > limit || Math.abs(z) > limit) continue
       if (Math.hypot(x, z) < CLEARING) continue
       if (slopeAt(x, z) > maxSlope) continue
+      // Nothing grows or is stacked in standing water.
+      if (sampledHeightAt(field, x, z) < terrain.waterLevel + 0.15) continue
       if (taken.some((p) => Math.hypot(p.x - x, p.z - z) < MIN_SEPARATION)) continue
       // A wall covers metres, not a point, so a separation check on its centre
       // is not enough to keep a crate from spawning inside it.
@@ -245,6 +251,27 @@ function generate(spec: WorldGenSpec): ResolvedScene {
         built.push({ x: px, z: pz, halfX: 0.35, halfZ: 0.35 })
       }
     }
+  }
+
+  // Trees last among the fixed things, and gathered tightly so they read as
+  // groves rather than as an orchard. They are the strongest signal that this is
+  // a place rather than a heightfield, and the cheapest cover to walk between.
+  const trees = Math.round(total * 0.55)
+  for (let i = 1; i <= trees; i++) {
+    const height = 3.2 + random() * 2.6
+    // The footprint is the trunk, not the canopy — you walk under branches.
+    const trunk = 0.34 + random() * 0.16
+    add(
+      `tree_${i}`,
+      'tree',
+      [trunk, height, trunk],
+      pick(random, FOLIAGE_COLORS),
+      false,
+      200,
+      true,
+      0.45,
+      6
+    )
   }
 
   // Crates are the things worth carrying, so they stay a graspable block size,

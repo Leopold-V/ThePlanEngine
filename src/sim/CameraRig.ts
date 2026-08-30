@@ -58,7 +58,7 @@ export class CameraRig {
   private readonly desired = new THREE.Vector3()
 
   constructor(canvas: HTMLCanvasElement) {
-    this.camera = new THREE.PerspectiveCamera(DEFAULT_FOV, 1, DEFAULT_NEAR, 200)
+    this.camera = new THREE.PerspectiveCamera(DEFAULT_FOV, 1, DEFAULT_NEAR, 600)
     this.camera.position.set(4.5, 3.4, 6)
     this.camera.rotation.order = 'YXZ'
 

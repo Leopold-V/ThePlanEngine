@@ -34,7 +34,7 @@ export class CameraView {
   private readonly pixels = new Uint8Array(WIDTH * HEIGHT * 4)
 
   constructor() {
-    this.camera = new THREE.PerspectiveCamera(60, WIDTH / HEIGHT, 0.1, 120)
+    this.camera = new THREE.PerspectiveCamera(60, WIDTH / HEIGHT, 0.3, 600)
     this.target = new THREE.WebGLRenderTarget(WIDTH, HEIGHT)
 
     this.canvas = document.createElement('canvas')
@@ -61,7 +61,9 @@ export class CameraView {
     this.camera.position.set(eye.x, eye.y + EYE_HEIGHT, eye.z)
     // Match the sensor the observation uses, so the picture and the text agree.
     this.camera.fov = Math.min(170, perception.halfAngleDeg * 2)
-    this.camera.far = Math.max(20, perception.range * 2)
+    // Far enough to reach the horizon. Range limits what perception *reports*,
+    // not what a lens can see — clipping the photo at sensor range hid every
+    // landmark beyond it, which is the opposite of what a camera is for.
     // A three.js camera looks down its local -Z, but heading 0 faces world +Z,
     // so the yaw needs half a turn or the robot photographs what is behind it.
     // Sensor heading, not body heading: the camera is in the head and turns

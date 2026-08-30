@@ -6,6 +6,7 @@ import { CameraRig, type CameraMode } from './CameraRig.js'
 import { CameraView } from './CameraView.js'
 import { Hud, type BubbleTone } from './Hud.js'
 import { Terrain } from './Terrain.js'
+import { Sky } from './Sky.js'
 import { resolveScene } from '@shared/worldgen.js'
 import type { TerrainSpec } from '@shared/terrain.js'
 import { DebugVisuals } from './debugVisuals.js'
@@ -54,6 +55,7 @@ export class World {
 
   private readonly rig: CameraRig
   private readonly hud: Hud
+  private readonly sky = new Sky()
   private terrain: Terrain | null = null
   private readonly debug = new DebugVisuals()
   private readonly cameraView = new CameraView()
@@ -81,8 +83,9 @@ export class World {
 
   private constructor(canvas: HTMLCanvasElement) {
     this.scene = new THREE.Scene()
-    this.scene.background = new THREE.Color(0x0b0d12)
-    this.scene.fog = new THREE.Fog(0x0b0d12, 22, 48)
+    // The dome is the background; anything behind it is never seen.
+    this.scene.add(this.sky.mesh)
+    this.scene.fog = new THREE.Fog(this.sky.horizon, 22, 48)
 
     this.rig = new CameraRig(canvas)
     this.hud = new Hud(canvas)
@@ -347,7 +350,9 @@ export class World {
 
   /** Keeps the far haze just past the edge, whatever size the world is. */
   private applyFog(spec: TerrainSpec): void {
-    this.scene.fog = new THREE.Fog(0x0b0d12, spec.halfExtent * 0.9, spec.halfExtent * 2.2)
+    // Tinted to the horizon, so distance dissolves into sky instead of into
+    // a dark band that reads as the edge of the map.
+    this.scene.fog = new THREE.Fog(this.sky.horizon, spec.halfExtent * 0.75, spec.halfExtent * 2.6)
   }
 
   private updatePerception(): void {
@@ -419,6 +424,7 @@ export class World {
       // The wedge shows where the sensors point, which is the head.
       this.debug.update(this.robot.position, this.robot.sensorHeading)
       this.followWithLight()
+      this.sky.follow(this.robot.position)
 
       // Framing runs on the frame delta, not the fixed step: it is direction,
       // not simulation, and it should stay smooth however physics is pacing.
@@ -442,6 +448,7 @@ export class World {
     this.rig.dispose()
     this.hud.dispose()
     this.terrain?.dispose(this.scene, this.physics)
+    this.sky.dispose()
     this.debug.dispose()
     this.renderer.dispose()
     this.physics.free()

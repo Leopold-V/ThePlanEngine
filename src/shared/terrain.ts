@@ -32,6 +32,14 @@ export interface TerrainSpec {
    * the robot's jump height or the terraces become scenery it cannot use.
    */
   terraceStep: number
+  /**
+   * Height of standing water. Anything the landform dips below this fills.
+   *
+   * Kept shallow relative to the relief: it is there to make the low ground
+   * mean something and to give the eye a flat reference among the slopes, not
+   * to be an obstacle — the robot has no notion of swimming.
+   */
+  waterLevel: number
 }
 
 /** What every scene written before terrain existed assumes. */
@@ -42,7 +50,8 @@ export const FLAT_TERRAIN: TerrainSpec = {
   amplitude: 0,
   featureSize: 1,
   clearingRadius: 0,
-  terraceStep: 0
+  terraceStep: 0,
+  waterLevel: -999
 }
 
 export function isFlat(spec: TerrainSpec): boolean {

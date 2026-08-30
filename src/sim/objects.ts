@@ -56,6 +56,52 @@ function rockGeometry(spec: ObjectSpec): THREE.BufferGeometry {
 }
 
 /**
+ * A trunk with a canopy above it, drawn deliberately wider than its collider.
+ *
+ * Unlike a rock, a tree is *not* inscribed in its box. The spec's footprint is
+ * the trunk, because that is the part you walk into — the canopy overhangs it
+ * and you walk under branches. So the collider stays honest for the footprint
+ * arithmetic while the tree still looks like a tree.
+ */
+function treeGeometry(spec: ObjectSpec): THREE.BufferGeometry {
+  const [w, h] = spec.size
+  let hash = 0
+  for (let i = 0; i < spec.id.length; i++) hash = (Math.imul(hash, 31) + spec.id.charCodeAt(i)) | 0
+  const wobble = ((hash >>> 7) % 100) / 100
+
+  const trunkHeight = h * (0.42 + wobble * 0.12)
+  const trunk = new THREE.CylinderGeometry(w * 0.3, w * 0.42, trunkHeight, 6)
+  trunk.translate(0, trunkHeight / 2 - h / 2, 0)
+
+  // Two stacked tiers read as foliage at this poly count; one reads as a hat.
+  const spread = w * (1.9 + wobble * 0.7)
+  const lower = new THREE.ConeGeometry(spread * 0.5, h * 0.46, 7)
+  lower.translate(0, trunkHeight - h / 2 + h * 0.16, 0)
+  const upper = new THREE.ConeGeometry(spread * 0.34, h * 0.38, 7)
+  upper.translate(0, trunkHeight - h / 2 + h * 0.42, 0)
+
+  const merged = mergeGeometries([trunk, lower, upper])
+  merged.rotateY(wobble * Math.PI * 2)
+  merged.computeVertexNormals()
+  return merged
+}
+
+/** Concatenates position-only geometries. Enough for the shapes built here. */
+function mergeGeometries(parts: THREE.BufferGeometry[]): THREE.BufferGeometry {
+  const positions: number[] = []
+  for (const part of parts) {
+    const nonIndexed = part.index ? part.toNonIndexed() : part
+    const array = (nonIndexed.attributes.position as THREE.BufferAttribute).array
+    for (let i = 0; i < array.length; i++) positions.push(array[i] as number)
+    if (nonIndexed !== part) nonIndexed.dispose()
+    part.dispose()
+  }
+  const merged = new THREE.BufferGeometry()
+  merged.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  return merged
+}
+
+/**
  * A spawned object: its spec, its three.js mesh, and its Rapier body.
  *
  * Bodies are dynamic so objects fall, stack and get knocked over. Carrying
@@ -76,12 +122,16 @@ export class WorldObject {
     const [w, h, d] = spec.size
 
     this.mesh = new THREE.Mesh(
-      spec.kind === 'boulder' ? rockGeometry(spec) : new THREE.BoxGeometry(w, h, d),
+      spec.kind === 'boulder'
+        ? rockGeometry(spec)
+        : spec.kind === 'tree'
+          ? treeGeometry(spec)
+          : new THREE.BoxGeometry(w, h, d),
       new THREE.MeshStandardMaterial({
         color: spec.color,
-        roughness: spec.kind === 'boulder' ? 0.95 : 0.6,
-        metalness: spec.kind === 'boulder' ? 0 : 0.1,
-        flatShading: spec.kind === 'boulder'
+        roughness: spec.kind === 'boulder' || spec.kind === 'tree' ? 0.95 : 0.6,
+        metalness: spec.kind === 'boulder' || spec.kind === 'tree' ? 0 : 0.1,
+        flatShading: spec.kind === 'boulder' || spec.kind === 'tree'
       })
     )
     this.mesh.castShadow = true

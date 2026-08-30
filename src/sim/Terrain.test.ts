@@ -10,7 +10,8 @@ const ROLLING: TerrainSpec = {
   amplitude: 3.4,
   featureSize: 14,
   clearingRadius: 4,
-  terraceStep: 0.85
+  terraceStep: 0.85,
+  waterLevel: -1.2
 }
 
 beforeAll(async () => {

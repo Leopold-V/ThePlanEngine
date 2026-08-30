@@ -227,6 +227,17 @@ from a hand-written one, which is what let terrain land without touching any of 
   meet there and report nothing.** This looks alarmingly like a hole in the ground and is not one
   — a capsule sweeps a volume and stands on those lines quite happily. Ray-based tests must use
   probe coordinates that do not land on a seam; `Terrain.test.ts` offsets them deliberately.
+- **The sky is the background, and fog is tinted to its horizon.** A flat dark clear colour makes
+  the terrain simply stop, which reads as the edge of the map rather than as distance. The dome
+  follows the viewer so its edge can never be reached.
+- **A camera's far plane must reach the horizon.** `CameraView` once used `perception.range * 2`,
+  which clipped every photo at 16m: range limits what perception *reports*, not what a lens can
+  see, and the two are not the same thing.
+- **A tree's collider is its trunk, and the canopy overhangs it deliberately** — the opposite of a
+  boulder. You walk under branches, so the footprint is the part you can walk into.
+- **Water is visual only.** Nothing spawns below the water line, and the robot walks straight
+  through: it has no notion of swimming, and a puddle it can cross is a better lie than an
+  invisible wall around every basin.
 - **A boulder's collider is the spec's box, not its mesh.** The rock is drawn inscribed inside it,
   because the footprint arithmetic in `criteria.ts`, `jump.ts` and `steering.ts` all assume an
   axis-aligned box. The robot stops a few centimetres early — the safe direction to be wrong.

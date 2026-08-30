@@ -18,6 +18,8 @@ import {
 export class Terrain {
   readonly mesh: THREE.Mesh
   readonly grid: THREE.GridHelper | null
+  /** Standing water, where the landform dips below the water level. */
+  readonly water: THREE.Mesh | null
   private readonly field: HeightField
   private readonly collider: RAPIER.Collider
 
@@ -55,6 +57,28 @@ export class Terrain {
       : null
     if (this.grid) this.grid.position.y = 0.01
 
+    // A single flat pane at the water line. Nothing physical: the robot has no
+    // notion of swimming, and a puddle it can walk through is a better lie than
+    // an invisible wall around every basin.
+    this.water =
+      isFlat(spec) || spec.waterLevel < -100
+        ? null
+        : new THREE.Mesh(
+            new THREE.PlaneGeometry(size, size),
+            new THREE.MeshStandardMaterial({
+              color: 0x24405e,
+              roughness: 0.18,
+              metalness: 0.35,
+              transparent: true,
+              opacity: 0.82
+            })
+          )
+    if (this.water) {
+      this.water.rotation.x = -Math.PI / 2
+      this.water.position.y = spec.waterLevel
+      this.water.receiveShadow = true
+    }
+
     this.collider = physics.createCollider(
       rapier.ColliderDesc.heightfield(this.field.nrows, this.field.ncols, this.field.heights, {
         x: size,
@@ -75,6 +99,7 @@ export class Terrain {
   addTo(scene: THREE.Scene): void {
     scene.add(this.mesh)
     if (this.grid) scene.add(this.grid)
+    if (this.water) scene.add(this.water)
   }
 
   dispose(scene: THREE.Scene, physics: RAPIER.World): void {
@@ -83,6 +108,11 @@ export class Terrain {
       scene.remove(this.grid)
       this.grid.dispose()
     }
+    if (this.water) {
+      scene.remove(this.water)
+      this.water.geometry.dispose()
+      ;(this.water.material as THREE.Material).dispose()
+    }
     this.mesh.geometry.dispose()
     ;(this.mesh.material as THREE.Material).dispose()
     physics.removeCollider(this.collider, false)
@@ -90,9 +120,9 @@ export class Terrain {
 }
 
 /** Valley floor, open ground, and exposed high ground. */
-const LOW = new THREE.Color(0x141824)
-const MID = new THREE.Color(0x2b3550)
-const HIGH = new THREE.Color(0x5a6480)
+const LOW = new THREE.Color(0x2c3a2e)
+const MID = new THREE.Color(0x3b4a44)
+const HIGH = new THREE.Color(0x6b7285)
 /** Steep faces read as bare rock rather than as more of the same ground. */
 const CLIFF = new THREE.Color(0x6b6357)
 
