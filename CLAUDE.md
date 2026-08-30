@@ -163,6 +163,22 @@ An unidentified belief keeps a stable `unknown_N` handle that works with `approa
 `pick_up`, and it goes on resolving after recognition, because the model may still be carrying it
 from an earlier turn.
 
+**The ground is something the robot senses, not something it walks into.** `terrainSense.ts` casts
+a fan of bearings across the sensor cone and reports the first notable change in ground height
+along each; `observe.ts` reduces that to at most three clauses. Before this the robot would stand
+at the bottom of a pit, facing two metres of earth, and report `Visible: nothing in view` — the
+largest thing in the world was the one thing perception could not see, and a model cannot diagnose
+what it is never told.
+
+- **It is sight, so it is bound by the cone and the range.** Turning round is still how you find
+  out what is behind you, and `proprioceptive` mode gets no readings at all: what is underfoot is
+  in the pose already, and the shape of the ground three metres out is not something encoders know.
+- **Silence on level ground is the feature.** The observation is resent every turn, so a line that
+  always appears is paid for on every call and stops being read. A step the robot could walk up is
+  not a reading.
+- **Readings are a distance and a height, and stop there.** Whether 1.4m is a wall or a staircase
+  depends on limits stated in the system prompt, and drawing that conclusion is the model's job.
+
 Rules that are easy to break:
 
 - **The sensors are in the head, not the chest.** `robot.sensorHeading` is body heading plus neck
@@ -211,8 +227,9 @@ at a second robot with a different model is an argument rather than a rewrite.
 
 ## The world is a volume of blocks
 
-`shared/voxel.ts` holds it; `sim/VoxelTerrain.ts` meshes and collides it. The heightfield in
-`terrain.ts` is the legacy path, still used by nothing that ships.
+`shared/voxel.ts` holds it; `sim/VoxelTerrain.ts` meshes and collides it. This is the only world
+representation — the heightfield it replaced has been deleted rather than left lying around, so
+there is no second way for a scene to have ground.
 
 - **One ground height per column was the whole problem.** Caves, overhangs and interiors were not
   hard on a heightfield, they were unrepresentable. Anything proposing "more world" on a
@@ -226,54 +243,35 @@ at a second robot with a different model is an argument rather than a rewrite.
   arrays cost over five seconds a world; the same geometry takes 829ms this way.
 - **Smooth noise quantised into blocks does not make cliffs.** Two-block ledges peaked at seven
   across a whole map at every setting worth using. Verticality worth jumping at has to be built.
+- **Terrain noise is banded, not single-scale.** Broad landforms for the skyline, a ridged band
+  for crests, a fine band for close ground. One band at one scale is uniformly bumpy: dull to look
+  at and featureless to navigate.
 - **Scenarios pin their seed; the sandbox rolls a fresh one.** A task whose world moves underneath
   it cannot be compared between runs, and a sandbox that is the same every launch is not
   procedural in any sense that matters.
 
-## The heightfield world (legacy)
+## Props, water and the horizon
 
-A scene document is either an object list or a `WorldGenSpec` — never both — and
-`resolveScene` in `shared/worldgen.ts` collapses the two before anything downstream sees them.
-Keep it that way: perception, criteria and the snapshot must stay unable to tell a generated world
-from a hand-written one, which is what let terrain land without touching any of them.
+A scene is a `VoxelSpec` plus a list of props, and `resolveScene` in `shared/worldgen.ts` stands
+the props on the blocks before anything downstream sees them. `voxel` is required rather than
+optional, so "a scene always has ground" holds by construction.
 
 - **Never store generated contents back into a scene.** The spec is the document; the landscape is
   derived. Same reason profiles are sparse — a scenario has to stay small and reproducible, and a
-  50m landscape is ten thousand numbers.
-- **Rapier's heightfield rows run along z, columns along x** — the transpose of the obvious
-  reading. Getting it backwards yields a landscape that looks entirely plausible and is mirrored
-  about the diagonal relative to its own collider, so the robot walks into invisible hills. This
-  is pinned by `Terrain.test.ts`, which raycasts the collider and compares; it is verified, not
-  reasoned about.
-- **`sampledHeightAt` approximates the collider, it does not match it.** Rapier triangulates each
-  cell while it interpolates bilinearly — a few centimetres apart inside a cell. Anything placed
-  on the ground is dropped from slightly above and left to settle.
+  60m landscape is hundreds of thousands of blocks.
 - **Ask `world.groundHeightAt(x, z)`; never assume zero.** `robot.teleport` takes the ground
   height for this reason.
 - Criteria are all *relative* — an object's base against a named surface's top, horizontal
   distances — so non-flat ground does not affect scoring. Keep new predicates relative too.
-- **`terraceStep` is tied to the robot's jump.** Terraces exist to give it something it must jump
-  onto rather than stroll up, so the step sits just under `Robot.MAX_JUMP_HEIGHT`. Raise it and
-  the ledges become scenery it cannot use; lower it and they become stairs.
-- **Sample resolution is tied to `terraceStep`.** The collider interpolates across a cell, so a
-  0.85m step spread over a 0.8m cell is a 46° ramp — inside what the robot can walk up, which
-  silently turns every ledge back into a slope. Cells are kept near 0.55m for this reason.
-- **A ramp is an absence, not an object.** Ramps are corridors where terracing is suppressed, so
-  the smooth underlying landform provides a walkable way up. Building them as objects would mean
-  rotated colliders, which the footprint arithmetic cannot take. The point is the route choice:
-  a plateau reachable either by finding the ramp or by jumping is a decision worth watching.
 - **Walls are axis-aligned, and that is a feature.** `ObjectSpec` has no rotation, but rectilinear
   runs also read as *built*, which is why they are there. They are taller than the robot so they
   cannot be jumped and do block sight — a wall is the first thing in this world that local
   steering genuinely cannot solve by swerving, which is what makes it a routing problem. Leave
   gaps in a run: a sealed enclosure is something the robot can only give up against.
-- **Terrain noise is banded, not single-scale.** Broad landforms for the skyline, a ridged band
-  for crests, a fine band for close ground. One band at one scale is uniformly bumpy: dull to look
-  at and featureless to navigate.
-- **A zero-width ray aimed exactly down a cell boundary can pass between the two triangles that
-  meet there and report nothing.** This looks alarmingly like a hole in the ground and is not one
-  — a capsule sweeps a volume and stands on those lines quite happily. Ray-based tests must use
-  probe coordinates that do not land on a seam; `Terrain.test.ts` offsets them deliberately.
+- **A zero-width ray aimed exactly down a seam between two triangles can pass between them and
+  report nothing.** This looks alarmingly like a hole in the ground and is not one — a capsule
+  sweeps a volume and stands on those lines quite happily. Block faces meet on exact half-metre
+  boundaries, so ray-based tests must probe at coordinates that do not land on one.
 - **The sky is the background, and fog is tinted to its horizon.** A flat dark clear colour makes
   the terrain simply stop, which reads as the edge of the map rather than as distance. The dome
   follows the viewer so its edge can never be reached.
@@ -300,10 +298,20 @@ from a hand-written one, which is what let terrain land without touching any of 
   the field of view, the belief map and proprioceptive mode. If a change needs ground truth to
   navigate, it is the wrong change.
 - **Ground is probed one stride ahead and no further.** Feeling the slope you are about to step
-  on is proprioception; querying distant ground is sight, and sight is earned with `look`. The
-  stride is *shorter* than the obstacle lookahead on purpose: measuring the rise over the full
-  probe averages a wall of earth into a gentle gradient — a 1.4m step 2.4m away reads as a slope
-  of 0.58, under the limit — so the robot walks into it and never reports terrain as the blocker.
+  on is proprioception; steering has to work in the dark, so this is all it gets. Sight is the
+  other channel and it goes through `terrainSense.ts`. The stride is *shorter* than the obstacle
+  lookahead on purpose: measuring the rise over the full probe averages a wall of earth into a
+  gentle gradient — a 1.4m step 2.4m away reads as a slope of 0.58, under the limit — so the robot
+  walks into it and never reports terrain as the blocker.
+- **The rise is measured from the robot's own feet, not from the ground under its position.** The
+  two differ in exactly the case that matters: pressed against a bank, the capsule's centre crosses
+  into the raised column while the feet stay at the bottom, so asking the world what is underneath
+  answers with the top of the wall and the rise ahead comes out as zero.
+- **`blockedBy` and `riseAhead` describe the straight line, like `avoiding`** — not the chosen
+  heading. A wall of earth leaves flat ground along its foot, so skirting it always scores well and
+  the robot slides along the base making no progress. Reading the blocker off the winning candidate
+  reports no reason at all in precisely the situation that most needs one. `trapped` is the
+  separate question of whether *every* direction is bad.
 - **What blocks the robot decides what it is told to try.** "Go round it" is right for a boulder
   and actively wrong in a hollow, where the way out is up. `Steer.blockedBy` separates the two,
   and the ground case reports the rise in metres so the model can weigh it against its jump.
@@ -326,7 +334,9 @@ from a hand-written one, which is what let terrain land without touching any of 
 - **A concave trap defeats it, and should.** The stall detector reports and the model replans;
   that is the loop the app exists to exercise.
 - `move_forward` deliberately does *not* steer. It is the egocentric primitive and its contract is
-  a straight line.
+  a straight line. **Not steering is not the same as not noticing**, though: it carries the same
+  stall detector, because leaning on a wall for the full timeout — 11.7 seconds for an 8m call —
+  is dull to watch and tells the model nothing it could not have been told in one.
 
 ## Interrupting a run
 

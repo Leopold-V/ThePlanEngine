@@ -5,15 +5,14 @@ import { WorldModel } from './WorldModel.js'
 import { CameraRig, type CameraMode } from './CameraRig.js'
 import { CameraView } from './CameraView.js'
 import { Hud, type BubbleTone } from './Hud.js'
-import { Terrain } from './Terrain.js'
 import { VoxelTerrain } from './VoxelTerrain.js'
 import { Sky } from './Sky.js'
 import { resolveScene } from '@shared/worldgen.js'
-import type { TerrainSpec } from '@shared/terrain.js'
 import { DebugVisuals } from './debugVisuals.js'
 import { describe } from './observe.js'
 import { DEFAULT_SCENE, WorldObject, type SceneDefinition } from './objects.js'
 import { DEFAULT_PERCEPTION, perceive, type PerceptionConfig, type Sighting } from './perception.js'
+import { senseGround, type GroundReading } from './terrainSense.js'
 import type { WorldView } from './WorldView.js'
 import type { WorldSnapshot } from '@shared/scenario.js'
 import type { ObservationDetail } from '@shared/profile.js'
@@ -57,13 +56,13 @@ export class World {
   private readonly rig: CameraRig
   private readonly hud: Hud
   private readonly sky = new Sky()
-  private terrain: Terrain | null = null
   private voxels: VoxelTerrain | null = null
   private readonly debug = new DebugVisuals()
   private readonly cameraView = new CameraView()
   private perceptionConfig: PerceptionConfig = DEFAULT_PERCEPTION
   private detail: ObservationDetail = 'full'
   private sightings: Sighting[] = []
+  private ground: GroundReading[] = []
   private simTime = 0
   private sincePerception = 0
 
@@ -185,12 +184,22 @@ export class World {
    * large world, and an image does.
    */
   observationText(detail: ObservationDetail = 'full'): string {
+    // No ground readings here either: the shape of the ground three metres out
+    // is sight, and this mode has none. What is underfoot is already in the
+    // pose, which is the part encoders genuinely give you.
     if (detail === 'proprioceptive') return describe(this.robot)
     // `full` is the classical stack, where detection and recognition arrive
     // together, so it simply names everything it senses. That is a property of
     // how the report is written, not of the belief map — which records only
     // what a camera genuinely recognised, whatever mode is running.
-    return describe(this.robot, this.model, this.sightings, this.simTime, detail === 'full')
+    return describe(
+      this.robot,
+      this.model,
+      this.sightings,
+      this.simTime,
+      detail === 'full',
+      this.ground
+    )
   }
 
   /**
@@ -254,6 +263,9 @@ export class World {
       get sightings() {
         return world.sightings
       },
+      get ground() {
+        return world.ground
+      },
       get now() {
         return world.simTime
       },
@@ -296,6 +308,7 @@ export class World {
     this.model.clear()
     this.hud.clear()
     this.sightings = []
+    this.ground = []
     this.updatePerception()
   }
 
@@ -326,34 +339,21 @@ export class World {
    * rather than assume zero — the world has not been flat since v0.6.
    */
   groundHeightAt(x: number, z: number): number {
-    if (this.voxels) return this.voxels.heightAt(x, z)
-    return this.terrain?.heightAt(x, z) ?? 0
+    return this.voxels?.heightAt(x, z) ?? 0
   }
 
   /** Metres from the centre of the world to its edge. */
   get halfExtent(): number {
-    if (this.voxels) return this.voxels.world.spec.halfExtent
-    return this.terrain?.spec.halfExtent ?? GROUND_HALF_EXTENT
+    return this.voxels?.world.spec.halfExtent ?? GROUND_HALF_EXTENT
   }
 
   private loadScene(scene: SceneDefinition): void {
-    // Enumerated, generated or voxel: this is where they become one thing.
     const resolved = resolveScene(scene)
 
-    this.terrain?.dispose(this.scene, this.physics)
-    this.terrain = null
     this.voxels?.dispose(this.scene, this.physics)
-    this.voxels = null
-
-    if (resolved.voxel) {
-      this.voxels = new VoxelTerrain(resolved.voxel, RAPIER, this.physics)
-      this.voxels.addTo(this.scene)
-      this.applyHaze(resolved.voxel.spec.halfExtent)
-    } else {
-      this.terrain = new Terrain(resolved.terrain, RAPIER, this.physics)
-      this.terrain.addTo(this.scene)
-      this.applyHaze(resolved.terrain.halfExtent)
-    }
+    this.voxels = new VoxelTerrain(resolved.voxel, RAPIER, this.physics)
+    this.voxels.addTo(this.scene)
+    this.applyHaze(resolved.voxel.spec.halfExtent)
 
     for (const spec of resolved.objects) {
       const object = new WorldObject(spec, RAPIER, this.physics)
@@ -378,6 +378,9 @@ export class World {
       this.perceptionConfig
     )
     this.model.update(this.sightings, this.simTime)
+    // The ground is sensed on the same tick and through the same cone as the
+    // objects standing on it — it is one sensor, not two.
+    this.ground = senseGround(this.robot, (x, z) => this.groundHeightAt(x, z), this.perceptionConfig)
 
     if (this.debug.group.visible) {
       const visible = new Set(this.sightings.map((s) => s.id))
@@ -461,7 +464,6 @@ export class World {
     this.resizeObserver.disconnect()
     this.rig.dispose()
     this.hud.dispose()
-    this.terrain?.dispose(this.scene, this.physics)
     this.voxels?.dispose(this.scene, this.physics)
     this.sky.dispose()
     this.debug.dispose()

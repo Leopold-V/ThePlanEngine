@@ -1,6 +1,7 @@
 import type { Robot } from './Robot.js'
 import type { WorldModel } from './WorldModel.js'
 import { footprintRadius, type Sighting } from './perception.js'
+import type { GroundReading } from './terrainSense.js'
 
 export interface Observation {
   x: number
@@ -34,7 +35,9 @@ export function describe(
   sightings?: Sighting[],
   now = 0,
   /** `full` mode names everything sensed; the others only what a camera saw. */
-  nameEverything = true
+  nameEverything = true,
+  /** The shape of the ground in the sensor cone. Empty where it is level. */
+  ground: GroundReading[] = []
 ): string {
   const o = observe(robot)
   // Height above the world's base plane. On terrain this is how the robot knows
@@ -50,6 +53,11 @@ export function describe(
   ]
 
   if (!model) return lines[0] as string
+
+  // Before the object list, because the ground is what you walk into first —
+  // and in a pit or against a bank it is the only thing there is to report.
+  const terrain = describeGround(ground)
+  if (terrain) lines.push(terrain)
 
   const visible = sightings ?? []
   // Named by whatever the model is entitled to call it. A thing that has been
@@ -85,6 +93,46 @@ export function describe(
 
 function size(radius: number): string {
   return `${(radius * 2).toFixed(1)}m`
+}
+
+/**
+ * The ground readings as one line, or nothing at all when it is level.
+ *
+ * Silence on flat ground is the point: the observation is resent every turn, so
+ * a line that always appears is paid for on every model call and stops being
+ * read. Appearing only when the ground has something to say is what makes it
+ * worth reading when it does.
+ *
+ * Reduced to three sectors rather than one clause per ray, because a bank
+ * across the whole cone is one fact about the world, not five.
+ */
+function describeGround(readings: GroundReading[]): string | null {
+  if (readings.length === 0) return null
+
+  const nearest = new Map<string, GroundReading>()
+  for (const reading of readings) {
+    const sector = groundSector(reading.bearingDeg)
+    const held = nearest.get(sector)
+    if (!held || reading.distance < held.distance) nearest.set(sector, reading)
+  }
+
+  // Ahead first: it is the direction the robot is about to walk in.
+  const clauses = ['ahead', 'to the left', 'to the right']
+    .map((sector) => [sector, nearest.get(sector)] as const)
+    .filter((entry): entry is readonly [string, GroundReading] => Boolean(entry[1]))
+    .map(
+      ([sector, r]) =>
+        `${r.rise > 0 ? 'rises' : 'falls'} ${Math.abs(r.rise).toFixed(2)}m ` +
+        `at ${r.distance.toFixed(1)}m ${sector}`
+    )
+
+  return `Ground: ${clauses.join('; ')}.`
+}
+
+function groundSector(deg: number): string {
+  if (deg < -15) return 'to the left'
+  if (deg > 15) return 'to the right'
+  return 'ahead'
 }
 
 function describeSighting(s: Sighting, belief?: { label: string; identified: boolean }): string {

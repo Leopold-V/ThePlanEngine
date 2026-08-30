@@ -54,14 +54,21 @@ export interface Steer {
    */
   trapped: boolean
   /**
-   * What is in the way when `trapped` — a thing, or the shape of the ground.
+   * What is in the way of the straight line to the target — a thing, or the
+   * shape of the ground. Null when the direct route is clear.
    *
-   * The difference decides what the robot should be told to try. "Go round it"
-   * is right for a boulder and actively wrong in a hollow, where the answer is
-   * to jump out.
+   * The straight line, not the chosen heading, for the same reason `avoiding`
+   * reads from it: the chosen heading is by definition the passable one. A wall
+   * of earth has flat ground along its foot, so skirting it always scores well
+   * and the robot slides along the base making no progress — reading the
+   * blocker off the winning candidate reports nothing at all in exactly the
+   * situation the model most needs explained.
+   *
+   * The difference between the two matters because they are different problems:
+   * a boulder has a way round, and a hollow has a way up.
    */
   blockedBy: 'obstacle' | 'ground' | null
-  /** Metres the ground climbs over the probe, when that is what stops it. */
+  /** Metres the ground climbs over a stride on the straight line. */
   riseAhead: number
 }
 
@@ -118,13 +125,22 @@ export function steerToward(
   const nearby = around.obstacles.filter(
     (o) => Math.hypot(o.x - from.x, o.z - from.z) - Math.max(o.halfX, o.halfZ) < RELEVANT
   )
-  const groundHere = around.groundHeightAt(from.x, from.z)
+  // Where the feet actually are, not the top of the column they stand in.
+  //
+  // These differ in exactly the case that matters. Pressed against a wall of
+  // earth, the robot's centre crosses into the raised column while its feet
+  // stay at the bottom, so asking the world for the ground height under itself
+  // answers with the top of the wall — the rise ahead comes out as zero and the
+  // robot leans there until the stall timer notices. Its own feet are something
+  // it knows without asking anything.
+  const groundHere = from.y
 
   let best = { heading: seek, cost: Infinity, offsetDeg: 0, obstructed: false, rise: 0 }
   // What is in the way of going straight at the target — which is the thing
   // being avoided. The chosen path is by definition the clear one, so reading
   // the answer off that would report nothing on every successful detour.
   let inTheWay: string | null = null
+  let straightRise = 0
 
   for (const offsetDeg of CANDIDATES_DEG) {
     const heading = seek + (offsetDeg * Math.PI) / 180
@@ -165,7 +181,10 @@ export function steerToward(
     const tooSteep = slope > SLOPE_LIMIT
     if (tooSteep) cost += (slope - SLOPE_LIMIT) * SLOPE_WEIGHT
 
-    if (offsetDeg === 0) inTheWay = worst?.id ?? null
+    if (offsetDeg === 0) {
+      inTheWay = worst?.id ?? null
+      straightRise = tooSteep ? rise : 0
+    }
     if (cost < best.cost) {
       best = {
         heading,
@@ -186,11 +205,14 @@ export function steerToward(
     heading: best.heading,
     forward,
     avoiding: best.offsetDeg === 0 ? null : inTheWay,
+    // Every direction is bad, which is a different question from whether the
+    // straight one is: the robot can be perfectly free to move and still have
+    // no way toward where it is going.
     trapped: best.obstructed || best.rise > 0,
     // A thing in the way takes precedence: it is the more specific answer, and
     // the one the robot can name.
-    blockedBy: best.obstructed ? 'obstacle' : best.rise > 0 ? 'ground' : null,
-    riseAhead: best.rise
+    blockedBy: inTheWay ? 'obstacle' : straightRise > 0 ? 'ground' : null,
+    riseAhead: straightRise
   }
 }
 

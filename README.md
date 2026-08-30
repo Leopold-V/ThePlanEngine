@@ -60,8 +60,15 @@ deliberately never corrected while an object is out of view, so the robot can be
 where something is until it looks again. Range, field of view, and occlusion are profile fields,
 so "how much does this model degrade with a narrower field of view" is a measurable experiment.
 
+The ground is sensed through the same cone. A world made of blocks has pits and banks in it, and
+a robot that could see crates but not the two metres of earth it was standing in would only ever
+discover the pit by failing to walk out of it. The line appears when the ground has something to
+say and is silent when it does not — and it is geometry, never a verdict: how steep is too steep
+is stated once in the system prompt, so weighing the two is the model's job.
+
 ```
 Robot at (1.98, 1.19) facing 46°. Holding: red_block.
+Ground: rises 2.00m at 3.5m ahead; rises 2.00m at 3.0m to the left.
 Visible: table at (5, 1) — 3.0m to the right.
 Remembered: blue_block at (-4, 2), last seen 2s ago; green_block at (-2, -5), last seen 3s ago.
 ```
@@ -239,6 +246,9 @@ v0.1 is the loop. The reason the project exists is what comes after it.
       the low ground, and a camera that can see the horizon
 - [x] **v0.13.5** — the world becomes a volume of blocks instead of a sheet of heights, so caves
       and overhangs are possible at all; the sandbox rerolls its seed, and the tasks move with it
+- [x] **v0.13.6** — the robot can see the ground it is standing in: terrain joins perception, so a
+      pit reports itself before anything has failed instead of after; the heightfield is deleted,
+      and `move_forward` stops leaning on walls until the timeout
 - [ ] **v0.14** — built structures: towers, gantries and neon, which is where the look and the
       verticality both come from
 - [ ] **v0.15** — recording and replay; deterministic reruns

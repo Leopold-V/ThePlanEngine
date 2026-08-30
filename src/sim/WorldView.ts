@@ -3,6 +3,7 @@ import type { WorldModel } from './WorldModel.js'
 import type { WorldObject } from './objects.js'
 import type { CameraFrame } from './CameraView.js'
 import type { PerceptionConfig, Sighting } from './perception.js'
+import type { GroundReading } from './terrainSense.js'
 import type { ObservationDetail } from '@shared/profile.js'
 
 /**
@@ -18,6 +19,11 @@ export interface WorldView {
   model: WorldModel
   /** Objects visible at the last perception tick. */
   sightings: Sighting[]
+  /**
+   * The shape of the ground in the sensor cone at the last tick — same sensor,
+   * same cone, same range as `sightings`. Empty where the ground is level.
+   */
+  ground: GroundReading[]
   /** Simulation seconds since the world started. */
   now: number
   perception: PerceptionConfig

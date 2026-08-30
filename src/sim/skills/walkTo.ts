@@ -53,7 +53,12 @@ export const walkTo: Skill<z.infer<typeof schema>> = {
       // Every direction obstructed. Give it a moment in case the way clears as
       // the robot shifts, then stop rather than crawling into the barrier.
       trappedFor = steer.trapped ? trappedFor + 1 / 60 : 0
-      if (steer.trapped) cause = { by: steer.blockedBy, rise: steer.riseAhead }
+      // What is across the direct route right now — kept whether or not every
+      // direction is blocked. A wall of earth leaves flat ground along its
+      // foot, so the robot slides along it rather than being trapped by it, and
+      // waiting for `trapped` would mean reporting no reason at all for the one
+      // failure that most needs one.
+      cause = steer.blockedBy ? { by: steer.blockedBy, rise: steer.riseAhead } : { by: null, rise: 0 }
       if (trappedFor > TRAPPED_SECONDS) {
         blocked = true
         return true
